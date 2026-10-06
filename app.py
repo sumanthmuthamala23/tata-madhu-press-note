@@ -1,13 +1,12 @@
 import os
-import time
+import json
 import base64
 import tempfile
 import urllib.parse
+import requests
 import streamlit as st
 from google import genai
 from google.genai import types
-from indic_transliteration import sanscript
-from indic_transliteration.sanscript import SchemeMap, SCHEMES, transliterate
 
 # Page setup
 st.set_page_config(
@@ -67,12 +66,11 @@ st.markdown(f"""
         border-radius: 8px !important;
     }}
 
-    /* Official Press Note Container */
     .press-box {{
         background-color: #ffffff;
         border: 2px solid #b82329;
         border-radius: 12px;
-        padding: 32px;
+        padding: 30px;
         box-shadow: 0 10px 25px rgba(0,0,0,0.08);
         color: #111111;
         line-height: 1.9;
@@ -104,7 +102,7 @@ st.markdown(f"""
 
 # ----------------- SYSTEM INSTRUCTION -----------------
 SYSTEM_INSTRUCTION = (
-    "You are the EXCLUSIVE Chief Media Secretary and Official Telugu Press Spokesperson "
+    "You are the EXCLUSIVE Chief Media Secretary & Official Telugu Press Spokesperson "
     "for Sri Tata Madhusudhan (Tata Madhu) Garu, Member of Legislative Council (MLC), "
     "Bharat Rashtra Samithi (BRS).\n\n"
     "STRICT CONSTRAINTS:\n"
@@ -122,17 +120,35 @@ SYSTEM_INSTRUCTION = (
     "   - విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం\n"
 )
 
+# 100% Reliable Google Input Tools Transliteration (Free, Instant, No Model Errors)
+def google_transliterate_telugu(text: str) -> str:
+    if not text.strip():
+        return ""
+    words = text.split()
+    converted_words = []
+    url = "https://inputtools.google.com/request?text={}&itc=te-t-i0-und&num=1"
+    
+    for word in words:
+        # Keep punctuation or pure English numbers as-is
+        if word.isdigit() or word in [",", ".", "!", "?", "-", ":"]:
+            converted_words.append(word)
+            continue
+        try:
+            req_url = url.format(urllib.parse.quote(word))
+            res = requests.get(req_url, timeout=4)
+            data = res.json()
+            if data[0] == "SUCCESS" and len(data[1][0][1]) > 0:
+                converted_words.append(data[1][0][1][0])
+            else:
+                converted_words.append(word)
+        except Exception:
+            converted_words.append(word)
+            
+    return " ".join(converted_words)
+
 def get_client(api_key: str):
     return genai.Client(api_key=api_key)
 
-# Local Offline Phonetic Conversion (100% Free, Instant, No API errors)
-def local_transliterate_to_telugu(text: str) -> str:
-    if not text.strip():
-        return ""
-    # Converts phonetic english/ITRANS to natural Telugu script
-    return transliterate(text, sanscript.ITRANS, sanscript.TELUGU)
-
-# Press Note Generation Function
 def generate_press_note(client: genai.Client, parts: list, occasion: str, location: str):
     prompt_context = (
         f"\nప్రకటన విభాగం / స్వభావం: {occasion}\n"
@@ -142,7 +158,7 @@ def generate_press_note(client: genai.Client, parts: list, occasion: str, locati
     )
     parts.append(prompt_context)
     
-    # Stable generation call
+    # Stable 2.5 Flash execution
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=parts,
@@ -256,13 +272,13 @@ with tab3:
             height=80,
             key="raw_eng_text"
         )
-        if st.button("🔄 తెలుగులోకి మార్చండి (Instant Local Convert)"):
+        if st.button("🔄 తెలుగులోకి మార్చండి (Convert to Telugu)"):
             if raw_eng.strip():
-                # Runs locally without external API latency or model errors
-                converted_telugu = local_transliterate_to_telugu(raw_eng)
-                st.session_state["telugu_notes"] = converted_telugu
-                st.success("✅ విజయవంతంగా తెలుగులోకి మారింది!")
-                st.rerun()
+                with st.spinner("ఖచ్చితమైన తెలుగులోకి మారుస్తోంది..."):
+                    converted = google_transliterate_telugu(raw_eng)
+                    st.session_state["telugu_notes"] = converted
+                    st.success("✅ విజయవంతంగా తెలుగులోకి మారింది!")
+                    st.rerun()
             else:
                 st.warning("దయచేసి ఇంగ్లీష్‌లో టెక్స్ట్ టైప్ చేయండి.")
 
@@ -285,13 +301,36 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
         with st.spinner("ఎమ్మెల్సీ గారి అధికారిక ప్రకటన సిద్ధమవుతోంది..."):
             try:
                 press_note_telugu = generate_press_note(client, input_parts, selected_scope, location)
-                st.session_state["generated_note"] = press_note_telugu
+                st.session_state["draft_note"] = press_note_telugu
+                st.session_state["final_note"] = press_note_telugu
+                st.session_state["is_finalized"] = False
             except Exception as e:
                 st.error(f"ఎర్రర్ సంభవించింది: {str(e)}")
 
-# Display Result
-if "generated_note" in st.session_state:
-    st.subheader("📄 అధికారిక ముసాయిదా (Official Press Release)")
+# Display & Edit Section
+if "draft_note" in st.session_state:
+    st.subheader("✏️ ఎడిట్ & ఫైనలైజ్ చేయండి (Edit & Finalize)")
+    
+    edited_note = st.text_area(
+        "ముసాయిదాను ఇక్కడ పరిశీలించి, అవసరమైన పేర్లు లేదా వివరాలను మార్చుకోండి:",
+        value=st.session_state.get("draft_note", ""),
+        height=260,
+        key="editor_area"
+    )
+    
+    col_d1, col_d2 = st.columns([1, 4])
+    with col_d1:
+        if st.button("✅ పూర్తయింది (Done / Finalize)", type="primary", use_container_width=True):
+            st.session_state["final_note"] = edited_note
+            st.session_state["is_finalized"] = True
+            st.success("ప్రెస్ నోట్ ఖరారైంది! క్రింద సోషల్ మీడియా విభాగాలలో సిద్ధంగా ఉంది.")
+
+# Official Canvas & Multi-Platform Social Media Hub
+if st.session_state.get("is_finalized", False):
+    final_content = st.session_state.get("final_note", "")
+    
+    st.divider()
+    st.subheader("📄 అధికారిక ముసాయిదా (Official Letterhead View)")
     
     st.markdown(f"""
     <div class="press-box">
@@ -300,7 +339,7 @@ if "generated_note" in st.session_state:
             <div class="party-title">శాసనమండలి సభ్యులు (Member of Legislative Council - MLC)<br>భారత రాష్ట్ర సమితి (BRS)</div>
         </div>
         <div>
-            {st.session_state["generated_note"].replace(chr(10), '<br>')}
+            {final_content.replace(chr(10), '<br>')}
         </div>
         <div style="border-top: 1.5px dashed #dc2626; margin-top: 25px; padding-top: 12px; text-align: right; font-size: 15px; font-weight: 600; color: #4b5563;">
             విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం
@@ -309,17 +348,46 @@ if "generated_note" in st.session_state:
     """, unsafe_allow_html=True)
     
     st.write("")
+    st.subheader("🌐 సోషల్ మీడియా పోస్టులు (Ready to Copy & Paste)")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button(
-            label="📥 టెక్స్ట్ ఫైల్‌గా డౌన్‌లోడ్ చేయండి",
-            data=st.session_state["generated_note"],
-            file_name=f"Tata_Madhu_Press_Note_{location.split()[0]}.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
-    with col2:
-        encoded_note = st.session_state["generated_note"][:1200]
-        wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(encoded_note)}"
+    # Extract clean lines for platform formatting
+    lines = [line.strip() for line in final_content.split("\n") if line.strip()]
+    headline = lines[0] if lines else "ఎమ్మెల్సీ తాతా మధుసూదన్ గారి ప్రకటన"
+    for l in lines:
+        if "హెడ్" in l or "శీర్షిక" in l or ":" in l:
+            headline = l.split(":")[-1].strip()
+            break
+            
+    summary_body = "\n".join(lines[1:5]) if len(lines) > 1 else final_content
+
+    # Platform specific texts
+    whatsapp_text = f"*{headline}*\n\n{final_content}\n\n_విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం_"
+    
+    twitter_text = f"🚨 {headline[:180]}\n\n- ఎమ్మెల్సీ తాతా మధుసూదన్\n\n#TataMadhu #BRSParty #Telangana #Khammam"
+    
+    facebook_text = f"📌 {headline}\n\n{final_content}\n\n#TataMadhusudhan #TataMadhu #BRS #Khammam #TelanganaPolitics"
+    
+    instagram_text = f"📢 {headline}\n.\n.\n{summary_body[:400]}...\n.\n.\n#TataMadhu #MLCTataMadhu #BRS #Khammam #Telangana #PrajaGontuka"
+    
+    youtube_text = f"TITLE:\n{headline} | MLC Tata Madhusudhan Speech\n\nDESCRIPTION:\n{final_content}\n\n#TataMadhu #BRS #TelanganaNews #MLCSpeech"
+
+    st1, st2, st3, st4, st5 = st.tabs(["🟢 WhatsApp", "🔵 Twitter (X)", "🔷 Facebook", "📸 Instagram", "🔴 YouTube"])
+    
+    with st1:
+        st.text_area("WhatsApp Text (నేరుగా పేస్ట్ చేయవచ్చు):", value=whatsapp_text, height=200)
+        wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(whatsapp_text[:1400])}"
         st.link_button("📲 వాట్సాప్‌లో షేర్ చేయండి", wa_url, use_container_width=True)
+        
+    with st2:
+        st.text_area("Twitter (X) Post (క్యారెక్టర్ పరిమితికి అనుగుణంగా):", value=twitter_text, height=140)
+        x_url = f"https://twitter.com/intent/tweet?text={urllib.parse.quote(twitter_text)}"
+        st.link_button("🐦 X (Twitter) లో పోస్ట్ చేయండి", x_url, use_container_width=True)
+
+    with st3:
+        st.text_area("Facebook Post:", value=facebook_text, height=200)
+        
+    with st4:
+        st.text_area("Instagram Caption:", value=instagram_text, height=180)
+
+    with st5:
+        st.text_area("YouTube Title & Description:", value=youtube_text, height=200)
