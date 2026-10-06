@@ -1,21 +1,27 @@
 import os
+import io
 import time
+import json
 import base64
 import tempfile
+import datetime
 import urllib.parse
 import requests
 import streamlit as st
+from docx import Document
+from docx.shared import Pt, Inches, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from google import genai
 from google.genai import types
 
 # Page setup
 st.set_page_config(
-    page_title="MLC తాతా మధు - ప్రెస్ నోట్ జనరేటర్",
+    page_title="MLC తాతా మధు - అధికారిక పత్రికా ప్రకటన జనరేటర్",
     page_icon="📰",
     layout="wide",
 )
 
-# Background Image Base64 Converter
+# Background & Letterhead Base64 Helper
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         with open(image_path, "rb") as img_file:
@@ -23,6 +29,7 @@ def get_base64_image(image_path):
     return None
 
 bg_image_base64 = get_base64_image("background.png")
+letterhead_base64 = get_base64_image("letterhead.png") or get_base64_image("letter head(2).jpg")
 
 if bg_image_base64:
     bg_style = f"""
@@ -66,36 +73,64 @@ st.markdown(f"""
         border-radius: 8px !important;
     }}
 
-    .press-box {{
+    /* Official Letterhead Replica Container */
+    .letterhead-container {{
         background-color: #ffffff;
-        border: 2px solid #b82329;
-        border-radius: 12px;
-        padding: 30px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        padding: 40px 48px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
         color: #111111;
         line-height: 1.9;
         font-size: 18px;
+        max-width: 900px;
+        margin: 0 auto;
     }}
     
-    .press-header {{
+    .lh-header-table {{
+        width: 100%;
+        border-bottom: 2px solid #b82329;
+        padding-bottom: 18px;
+        margin-bottom: 25px;
+    }}
+    
+    .lh-left {{
+        vertical-align: top;
+        text-align: left;
+        width: 35%;
+    }}
+    .lh-center {{
+        vertical-align: middle;
         text-align: center;
-        border-bottom: 2px dashed #b82329;
-        padding-bottom: 16px;
-        margin-bottom: 24px;
+        width: 30%;
+    }}
+    .lh-right {{
+        vertical-align: top;
+        text-align: right;
+        width: 35%;
+        font-size: 13px;
+        line-height: 1.45;
+        color: #1f2937;
     }}
     
-    .leader-title {{
-        color: #dc2626;
-        font-size: 30px;
+    .lh-leader-name {{
+        color: #b82329;
+        font-size: 24px;
         font-weight: 800;
+        letter-spacing: 0.5px;
         margin: 0;
+        text-transform: uppercase;
     }}
-    
-    .party-title {{
-        color: #374151;
-        font-size: 17px;
-        margin-top: 6px;
-        font-weight: 600;
+    .lh-leader-sub {{
+        font-size: 16px;
+        font-weight: 700;
+        color: #111827;
+        margin: 2px 0 0 0;
+    }}
+    .lh-leader-loc {{
+        font-size: 14px;
+        color: #4b5563;
+        margin: 0;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -120,7 +155,7 @@ SYSTEM_INSTRUCTION = (
     "   - విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం\n"
 )
 
-# Google Input Tools Transliteration
+# Transliteration Helper
 def google_transliterate_telugu(text: str) -> str:
     if not text.strip():
         return ""
@@ -130,7 +165,6 @@ def google_transliterate_telugu(text: str) -> str:
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)"
     }
-    
     for word in words:
         if word.isdigit() or word in [",", ".", "!", "?", "-", ":", ";"]:
             converted_words.append(word)
@@ -145,81 +179,202 @@ def google_transliterate_telugu(text: str) -> str:
                 converted_words.append(word)
         except Exception:
             converted_words.append(word)
-            
     return " ".join(converted_words)
 
-# Fully dynamic execution: pulls only live models from your account
-def generate_press_note_bulletproof(keys: list, parts: list, occasion: str, location: str):
-    prompt_context = (
-        f"\nప్రకటన విభాగం / స్వభావం: {occasion}\n"
-        f"స్థలం: {location}\n"
-        "దయచేసి పైన పేర్కొన్న వివరాలు మరియు అందించిన సమాచారం ఆధారంగా "
-        "ఎమ్మెల్సీ తాతా మధుసూదన్ గారి అధికారిక పత్రికా ప్రకటనను రూపొందించండి.\n"
-    )
-    full_parts = parts + [prompt_context]
-
+# Resilient Generation with Dynamic Active Model Discovery
+def generate_ai_response(keys: list, contents_list: list, system_instruction=SYSTEM_INSTRUCTION, temperature=0.3):
     last_error = None
-    
     for key in keys:
         if not key or not key.strip():
             continue
         try:
             client = genai.Client(api_key=key.strip())
-            
-            # 1. Fetch live models directly supported on this account
             active_models = []
             try:
                 for m in client.models.list():
                     name = m.name.replace("models/", "")
-                    # Filter for generation capable models
                     methods = getattr(m, "supported_generation_methods", []) or []
                     if not methods or "generateContent" in methods:
                         active_models.append(name)
             except Exception:
                 pass
             
-            # Prefer 3.8-flash, 3.1-pro-preview, then any active model
-            ordered_pool = []
-            for preferred in ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3-flash", "gemini-2.0-flash"]:
-                if preferred in active_models:
-                    ordered_pool.append(preferred)
-            
-            # Add any other live flash/pro model returned by the API
+            preferred = ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3-flash", "gemini-2.0-flash"]
+            pool = [m for m in preferred if m in active_models]
             for m in active_models:
-                if m not in ordered_pool and ("flash" in m or "pro" in m):
-                    ordered_pool.append(m)
-                    
-            if not ordered_pool:
-                ordered_pool = ["gemini-3.8-flash", "gemini-3.1-pro-preview"]
+                if m not in pool and ("flash" in m or "pro" in m):
+                    pool.append(m)
+            if not pool:
+                pool = ["gemini-3.8-flash", "gemini-3.1-pro-preview"]
 
-            # 2. Iterate through strictly valid, active models
-            for model_name in ordered_pool:
-                for retry in range(2):
+            for model_name in pool:
+                for attempt in range(2):
                     try:
-                        response = client.models.generate_content(
+                        res = client.models.generate_content(
                             model=model_name,
-                            contents=full_parts,
+                            contents=contents_list,
                             config=types.GenerateContentConfig(
-                                system_instruction=SYSTEM_INSTRUCTION,
-                                temperature=0.3,
+                                system_instruction=system_instruction,
+                                temperature=temperature,
                             ),
                         )
-                        if response and response.text:
-                            return response.text
+                        if res and res.text:
+                            return res.text
                     except Exception as err:
                         last_error = err
-                        # If 503 high demand, back off briefly
-                        time.sleep(1.5)
+                        time.sleep(1.2)
                         continue
         except Exception as client_err:
             last_error = client_err
             continue
-
     raise last_error
+
+# DOCX Generator
+def create_docx_press_note(text: str, date_str: str, location_str: str) -> io.BytesIO:
+    doc = Document()
+    
+    # Official Header
+    p_header = doc.add_paragraph()
+    run_name = p_header.add_run("TATA MADHUSUDHAN\n")
+    run_name.font.name = "Arial"
+    run_name.font.size = Pt(16)
+    run_name.bold = True
+    run_name.font.color.rgb = RGBColor(184, 35, 41)
+    
+    run_desig = p_header.add_run("M.L.C\nKhammam, Telangana\n")
+    run_desig.font.name = "Arial"
+    run_desig.font.size = Pt(11)
+    run_desig.bold = True
+    
+    run_hq = p_header.add_run(
+        "Quarter No. 1104, 11th Floor, M.S. Block-III, Old MLA Quarters, "
+        "Hyderguda, Hyderabad - 500029 | e-mail: tatamadhu@gmail.com\n"
+    )
+    run_hq.font.name = "Arial"
+    run_hq.font.size = Pt(9)
+    run_hq.font.color.rgb = RGBColor(100, 100, 100)
+    
+    doc.add_paragraph("―" * 55)
+    
+    # Date & Place
+    p_meta = doc.add_paragraph(f"స్థలం: {location_str} | తేదీ: {date_str}\n")
+    p_meta.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    
+    # Body Content
+    for line in text.split("\n"):
+        if line.strip():
+            p = doc.add_paragraph(line.strip())
+            p.paragraph_format.line_spacing = 1.3
+            p.paragraph_format.space_after = Pt(6)
+            
+    bio = io.BytesIO()
+    doc.save(bio)
+    bio.seek(0)
+    return bio
+
+# Printable HTML Template with Official Letterhead
+def get_printable_letterhead_html(content: str, date_str: str, location_str: str) -> str:
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>MLC Tata Madhusudhan Press Note</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@400;600;700;800&display=swap');
+            body {{
+                font-family: 'Anek Telugu', sans-serif;
+                background-color: #ffffff;
+                margin: 0;
+                padding: 40px;
+                color: #111;
+            }}
+            .container {{
+                max-width: 800px;
+                margin: 0 auto;
+                border: 1px solid #ccc;
+                padding: 40px;
+            }}
+            .header-table {{
+                width: 100%;
+                border-bottom: 2px solid #b82329;
+                padding-bottom: 12px;
+                margin-bottom: 20px;
+            }}
+            .leader-title {{
+                color: #b82329;
+                font-size: 22px;
+                font-weight: 800;
+                margin: 0;
+            }}
+            .leader-sub {{
+                font-size: 15px;
+                font-weight: 700;
+                margin: 2px 0;
+            }}
+            .hq-address {{
+                font-size: 11px;
+                color: #444;
+                line-height: 1.4;
+                text-align: right;
+            }}
+            .meta {{
+                text-align: right;
+                font-weight: 600;
+                font-size: 14px;
+                margin-bottom: 15px;
+            }}
+            .content {{
+                font-size: 16px;
+                line-height: 1.85;
+            }}
+            @media print {{
+                body {{ padding: 0; }}
+                .container {{ border: none; padding: 0; }}
+                .no-print {{ display: none; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+            <button onclick="window.print()" style="padding: 10px 24px; font-size: 16px; background-color: #b82329; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                🖨️ Print / Save as PDF or JPEG
+            </button>
+        </div>
+        <div class="container">
+            <table class="header-table">
+                <tr>
+                    <td style="width: 38%; vertical-align: top;">
+                        <h2 class="leader-title">TATA MADHUSUDHAN</h2>
+                        <div class="leader-sub">M.L.C</div>
+                        <div style="font-size: 13px; color: #555;">Khammam, Telangana</div>
+                    </td>
+                    <td style="width: 24%; text-align: center; vertical-align: middle;">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/180px-BRS_Car_Symbol.png" width="60" alt="Emblem">
+                    </td>
+                    <td style="width: 38%; vertical-align: top;" class="hq-address">
+                        Quarter No. 1104, 11th Floor,<br>
+                        M.S. Block-III, Old MLA Quarters,<br>
+                        Hyderguda, Hyderabad - 500029<br>
+                        e-mail: tatamadhu@gmail.com
+                    </td>
+                </tr>
+            </table>
+            <div class="meta">స్థలం: {location_str} | తేదీ: {date_str}</div>
+            <div class="content">
+                {content.replace(chr(10), '<br>')}
+            </div>
+            <div style="border-top: 1px dashed #b82329; margin-top: 30px; padding-top: 10px; text-align: right; font-weight: bold; color: #444;">
+                విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/240px-BRS_Car_Symbol.png", width=80)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/240px-BRS_Car_Symbol.png", width=75)
     st.title("సెట్టింగ్స్ (Settings)")
     
     default_key = ""
@@ -238,12 +393,26 @@ with st.sidebar:
         help="Google AI Studio API Key ఇక్కడ నమోదు చేయండి."
     )
     
-    location = st.text_input(
-        "స్థలం (Location / Venue)",
-        value="హైదరాబాద్ / ఖమ్మం",
-        help="స్టేట్‌మెంట్ విడుదల చేసే స్థలం (ఉదా: హైదరాబాద్, ఖమ్మం, శాసనమండలి, ఢిల్లీ)."
-    )
+    # Date Picker Component
+    st.markdown("##### 📅 ప్రకటన తేదీ (Date):")
+    selected_date = st.date_input("తేదీని ఎంచుకోండి", value=datetime.date.today())
+    formatted_date = selected_date.strftime("%d-%m-%Y")
     
+    # Location with Instant Telugu Converter
+    st.markdown("##### 📍 స్థలం / వేదిక (Location / Venue):")
+    if "location_input_val" not in st.session_state:
+        st.session_state["location_input_val"] = "హైదరాబాద్ / ఖమ్మం"
+        
+    loc_eng = st.text_input("ఇంగ్లీష్‌లో టైప్ చేయండి:", placeholder="e.g. Khammam, Palair, Hyderabad...", key="loc_eng_raw")
+    if st.button("తెలుగులోకి మార్చండి (Convert Location)"):
+        if loc_eng.strip():
+            converted_loc = google_transliterate_telugu(loc_eng)
+            st.session_state["location_input_val"] = converted_loc
+            st.rerun()
+
+    final_location = st.text_input("ఫైనల్ స్థలం (Telugu Location):", value=st.session_state["location_input_val"], key="final_loc_key")
+
+    # 10 Topic Scopes
     topic_scopes = [
         "ప్రజా సమస్యలు & వినతులు (Public Grievances & Demands)",
         "ప్రభుత్వ విధానాలు / విమర్శలు (State Govt Policies / Criticisms)",
@@ -264,7 +433,7 @@ if backup_key and backup_key != api_key_input:
 
 # ----------------- MAIN UI -----------------
 st.title("🎙️ ఎమ్మెల్సీ తాతా మధుసూదన్ - పత్రికా ప్రకటన జనరేటర్")
-st.caption("వాయిస్ రికార్డింగ్, ఆడియో/వీడియో లేదా టెక్స్ట్ నోట్స్ ద్వారా మీడియా-రెడీ తెలుగు ప్రెస్ నోట్ రూపొందించండి.")
+st.caption(f"తేదీ: {formatted_date} | స్థలం: {final_location} | అధికారిక లెటర్‌హెడ్ ఫార్మాట్")
 
 if not api_key_input:
     st.warning("ముందుగా సైడ్‌బార్‌లో మీ Gemini API Keyని నమోదు చేయండి.")
@@ -345,55 +514,146 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
     if not input_parts:
         st.error("⚠️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
     else:
-        with st.spinner("సర్వర్‌తో కనెక్ట్ అవుతోంది... అధికారిక ప్రెస్ నోట్ సిద్ధమవుతోంది..."):
+        with st.spinner("అధికారిక ప్రెస్ నోట్ సిద్ధమవుతోంది..."):
             try:
-                press_note_telugu = generate_press_note_bulletproof(active_keys, input_parts, selected_scope, location)
+                prompt_instruction = (
+                    f"\nప్రకటన విభాగం / స్వభావం: {selected_scope}\n"
+                    f"స్థలం: {final_location}\n"
+                    f"తేదీ: {formatted_date}\n"
+                    "దయచేసి పైన పేర్కొన్న తేదీ, స్థలం మరియు అందించిన సమాచారం ఆధారంగా "
+                    "ఎమ్మెల్సీ తాతా మధుసూదన్ గారి అధికారిక పత్రికా ప్రకటనను రూపొందించండి.\n"
+                )
+                parts_with_prompt = input_parts + [prompt_instruction]
+                press_note_telugu = generate_ai_response(active_keys, parts_with_prompt)
                 st.session_state["draft_note"] = press_note_telugu
                 st.session_state["final_note"] = press_note_telugu
                 st.session_state["is_finalized"] = False
             except Exception as e:
-                st.error(f"ఎర్రర్ సంభవించింది: {str(e)}")
+                st.error(f"సర్వర్ బిజీగా ఉంది, దయచేసి మరోసారి ప్రయత్నించండి: {str(e)}")
 
-# Display & Edit Section
+# Display, Edit & AI Suggestion Refinement Section
 if "draft_note" in st.session_state:
-    st.subheader("✏️ ఎడిట్ & ఫైనలైజ్ చేయండి (Edit & Finalize)")
+    st.subheader("✏️ ఎడిట్ & AI సలహాలు (Edit & AI Remarks)")
     
     edited_note = st.text_area(
-        "ముసాయిదాను ఇక్కడ పరిశీలించి, అవసరమైన పేర్లు లేదా వివరాలను మార్చుకోండి:",
+        "ముసాయిదాను ఇక్కడ పరిశీలించి నేరుగా సవరించవచ్చు:",
         value=st.session_state.get("draft_note", ""),
         height=260,
         key="editor_area"
     )
     
-    col_d1, col_d2 = st.columns([1, 4])
-    with col_d1:
-        if st.button("✅ పూర్తయింది (Done / Finalize)", type="primary", use_container_width=True):
-            st.session_state["final_note"] = edited_note
-            st.session_state["is_finalized"] = True
-            st.success("ప్రెస్ నోట్ ఖరారైంది! క్రింద సోషల్ మీడియా విభాగాలలో సిద్ధంగా ఉంది.")
+    # Directly Connected Gemini Suggestion / Agony / Tone Refinement Box
+    st.markdown("##### 🤖 జెమినీ AI సలహా / ఆగ్రహం / మోడ్ మార్పు (AI Tone & Situation Re-generator):")
+    with st.expander("💡 ప్రెస్ నోట్ టోన్ మార్చాలా? (ఉదా: ప్రభుత్వంపై తీవ్ర ఆగ్రహం, రైతుల ఆవేదన పెంచడం, వివరాలు జోడించడం)", expanded=True):
+        ai_remark = st.text_input(
+            "మీ సూచన లేదా అభ్యర్థనను ఇక్కడ రాయండి (English or Telugu):",
+            placeholder="e.g., 'Make the tone very aggressive against the government', 'రైతుల ఆవేదనను మరింత భావోద్వేగంగా మార్చండి'..."
+        )
+        if st.button("⚡ సూచన ఆధారంగా ప్రెస్ నోట్ తిరిగి రూపొందించండి (Re-generate with AI)"):
+            if ai_remark.strip():
+                with st.spinner("మీ సూచన ప్రకారం ప్రెస్ నోట్‌ను సరిచేస్తోంది..."):
+                    try:
+                        refine_prompt = f"""
+                        CURRENT PRESS NOTE DRAFT:
+                        {edited_note}
+                        
+                        USER INSTRUCTION / REMARK / AGONY / SITUATION UPDATE:
+                        {ai_remark}
+                        
+                        TASK:
+                        Rewrite and enhance the press release strictly following the user's instructions (e.g. increase agony, make it more aggressive, add specific points) while maintaining the official persona of MLC Tata Madhusudhan Garu and standard Telugu journalistic standards.
+                        """
+                        updated_note = generate_ai_response(active_keys, [refine_prompt])
+                        st.session_state["draft_note"] = updated_note
+                        st.session_state["final_note"] = updated_note
+                        st.success("✅ మీ సూచన ప్రకారం ప్రెస్ నోట్ విజయవంతంగా మార్చబడింది!")
+                        st.rerun()
+                    except Exception as err:
+                        st.error(f"రీ-జనరేట్ ఎర్రర్: {str(err)}")
+            else:
+                st.warning("దయచేసి మార్పుల కోసం సూచనను నమోదు చేయండి.")
+
+    st.write("")
+    if st.button("✅ పూర్తయింది - లెటర్‌హెడ్ & సోషల్ మీడియా వీక్షించండి (Finalize)", type="primary", use_container_width=True):
+        st.session_state["final_note"] = edited_note
+        st.session_state["is_finalized"] = True
+        st.success("ప్రెస్ నోట్ ఖరారైంది! అధికారిక లెటర్‌హెడ్ వీక్షణ సిద్ధంగా ఉంది.")
 
 # Official Canvas & Multi-Platform Social Media Hub
 if st.session_state.get("is_finalized", False):
     final_content = st.session_state.get("final_note", "")
     
     st.divider()
-    st.subheader("📄 అధికారిక ముసాయిదా (Official Letterhead View)")
+    st.subheader("📄 అధికారిక లెటర్‌హెడ్ వీక్షణ (Official Letterhead View)")
     
+    # Official Letterhead HTML View Matching Reference 1
     st.markdown(f"""
-    <div class="press-box">
-        <div class="press-header">
-            <h2 class="leader-title">తాతా మధుసూదన్ (తాతా మధు)</h2>
-            <div class="party-title">శాసనమండలి సభ్యులు (Member of Legislative Council - MLC)<br>భారత రాష్ట్ర సమితి (BRS)</div>
+    <div class="letterhead-container">
+        <table class="lh-header-table">
+            <tr>
+                <td class="lh-left">
+                    <h2 class="lh-leader-name">TATA MADHUSUDHAN</h2>
+                    <div class="lh-leader-sub">M.L.C</div>
+                    <div class="lh-leader-loc">Khammam, Telangana</div>
+                </td>
+                <td class="lh-center">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/180px-BRS_Car_Symbol.png" width="65" alt="Telangana Council Emblem">
+                </td>
+                <td class="lh-right">
+                    Quarter No. 1104, 11th Floor,<br>
+                    M.S. Block-III, Old MLA Quarters,<br>
+                    Hyderguda, Hyderabad - 500029<br>
+                    <strong>e-mail:</strong> tatamadhu@gmail.com
+                </td>
+            </tr>
+        </table>
+        <div style="text-align: right; font-weight: 600; font-size: 15px; margin-bottom: 20px; color: #374151;">
+            స్థలం: {final_location} &nbsp;|&nbsp; తేదీ: {formatted_date}
         </div>
-        <div>
+        <div style="line-height: 1.95; font-size: 18px;">
             {final_content.replace(chr(10), '<br>')}
         </div>
-        <div style="border-top: 1.5px dashed #dc2626; margin-top: 25px; padding-top: 12px; text-align: right; font-size: 15px; font-weight: 600; color: #4b5563;">
+        <div style="border-top: 1.5px dashed #b82329; margin-top: 30px; padding-top: 14px; text-align: right; font-size: 15px; font-weight: 700; color: #374151;">
             విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం
         </div>
     </div>
     """, unsafe_allow_html=True)
     
+    st.write("")
+    
+    # Multi-format Downloads (DOCX / HTML-Print / Text)
+    col_d1, col_d2, col_d3 = st.columns(3)
+    
+    with col_d1:
+        docx_data = create_docx_press_note(final_content, formatted_date, final_location)
+        st.download_button(
+            label="📄 Word File గా డౌన్‌లోడ్ చేయండి (.DOCX)",
+            data=docx_data,
+            file_name=f"Tata_Madhu_PressNote_{formatted_date}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True
+        )
+        
+    with col_d2:
+        html_page = get_printable_letterhead_html(final_content, formatted_date, final_location)
+        st.download_button(
+            label="🖨️ PDF / JPEG ప్రింట్ ఫైల్ (.HTML)",
+            data=html_page,
+            file_name=f"Tata_Madhu_Letterhead_{formatted_date}.html",
+            mime="text/html",
+            use_container_width=True,
+            help="డౌన్‌లోడ్ చేసి బ్రౌజర్‌లో ఓపెన్ చేసి 'Print' ➔ 'Save as PDF' లేదా JPEG గా సేవ్ చేసుకోవచ్చు."
+        )
+        
+    with col_d3:
+        st.download_button(
+            label="📥 టెక్స్ట్ ఫైల్‌గా డౌన్‌లోడ్ చేయండి (.TXT)",
+            data=final_content,
+            file_name=f"Tata_Madhu_PressNote_{formatted_date}.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
+
     st.write("")
     st.subheader("🌐 సోషల్ మీడియా పోస్టులు (Ready to Copy & Paste)")
     
