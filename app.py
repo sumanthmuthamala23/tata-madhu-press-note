@@ -266,7 +266,7 @@ SYSTEM_INSTRUCTION = (
     "1. LEADER EXCLUSIVITY: Every statement, critique, demand, or declaration must be strictly attributed "
     "to MLC Tata Madhusudhan (శాసనమండలి సభ్యులు తాతా మధుసూదన్ / తాతా మధు). Under no circumstances generate releases for anyone else.\n"
     "2. VIDEO / AUDIO HANDLING: When audio or video is provided, thoroughly analyze all spoken statements, "
-    "speeches, key arguments, facts, figures, and visual context. Capture the full political intensity and context of his speech accurately.\n"
+    "speeches, key arguments, facts, figures, and context. Capture the full political intensity and context of his speech accurately.\n"
     "3. NO JURISDICTION BOUNDARIES: He speaks on statewide governance, legislative council debates, Hyderabad affairs, national topics, and grassroots public grievances.\n"
     "4. JOURNALISTIC TELUGU: Write in standard high-register journalistic Telugu (ప్రామాణిక పత్రికా భాష) formatted for Telugu daily newspapers (Eenadu, Sakshi, Namasthe Telangana, Andhra Jyothy, etc.).\n"
     "5. STRUCTURE:\n"
@@ -582,10 +582,9 @@ if "audio_file_payload" not in st.session_state:
 
 input_parts = []
 
-# Input selector directly in layout
 input_mode = st.radio(
     "ఇన్‌పుట్ విధానం ఎంచుకోండి (Input Mode):",
-    ["📁 ఆడియో / వీడియో ఫైల్ అప్‌లోడ్ (File)", "🎤 లైవ్ రికార్డింగ్ (Mic)", "✍️️ సిట్యుయేషన్ నోట్స్ (Text)"],
+    ["📁 ఆడియో / వీడియో ఫైల్ అప్‌లోడ్ (File)", "🎤 లైవ్ రికార్డింగ్ (Mic)", "✍️ సిట్యుయేషన్ నోట్స్ (Text)"],
     index=0,
     horizontal=True
 )
@@ -595,18 +594,25 @@ st.write("")
 if input_mode == "📁 ఆడియో / వీడియో ఫైల్ అప్‌లోడ్ (File)":
     st.markdown("##### 📁 మొబైల్ లేదా ల్యాప్‌టాప్ రికార్డింగ్ ఫైల్ ఎంచుకోండి:")
     
-    # Simple direct file uploader
-    uploaded_file = st.file_uploader(
-        "ఆడియో లేదా వీడియో ఫైల్ ఎంచుకోండి (.m4a, .mp3, .wav, .mp4, మొదలైనవి):",
-        key="pinned_mobile_audio_uploader"
-    )
+    col_f1, col_f2 = st.columns([3, 1])
+    with col_f1:
+        uploaded_file = st.file_uploader(
+            "ఆడియో లేదా వీడియో ఫైల్ ఎంచుకోండి:",
+            type=None,
+            key="pinned_mobile_audio_uploader"
+        )
+    with col_f2:
+        if st.session_state.get("audio_file_payload"):
+            if st.button("🗑️ ఫైల్ తొలగించు (Clear File)", use_container_width=True):
+                st.session_state["audio_file_payload"] = None
+                st.rerun()
 
     if uploaded_file is not None:
         file_bytes = uploaded_file.read()
         f_name = uploaded_file.name
         fn_low = f_name.lower()
 
-        # Strict Gemini MIME type validation
+        # Normalize MIME types
         if fn_low.endswith((".m4a", ".aac")) or "m4a" in (uploaded_file.type or "").lower():
             clean_mime = "audio/mp4"
         elif fn_low.endswith(".mp3"):
@@ -620,11 +626,10 @@ if input_mode == "📁 ఆడియో / వీడియో ఫైల్ అప�
         elif fn_low.endswith(".mov"):
             clean_mime = "video/quicktime"
         else:
-            clean_mime = uploaded_file.type or "audio/mp4"
+            clean_mime = "audio/mp4"
 
         st.session_state["audio_file_payload"] = (f_name, file_bytes, clean_mime)
 
-    # Display confirmed attachment
     if st.session_state.get("audio_file_payload"):
         fn, fb, fm = st.session_state["audio_file_payload"]
         st.success(f"✅ ఫైల్ విజయవంతంగా సిద్ధమైంది: **{fn}** ({len(fb)/(1024*1024):.2f} MB)")
@@ -668,7 +673,7 @@ elif input_mode == "✍️ సిట్యుయేషన్ నోట్స్ 
 st.divider()
 
 if st.button("🚀 పత్రికా ప్రకటనను రూపొందించండి (Generate Press Note)", type="primary", use_container_width=True):
-    # Assemble input parts safely right before generating
+    # Assemble media payload right before generating
     if input_mode == "📁 ఆడియో / వీడియో ఫైల్ అప్‌లోడ్ (File)" and st.session_state.get("audio_file_payload"):
         fn, fb, fm = st.session_state["audio_file_payload"]
         if len(fb) > 20 * 1024 * 1024:
@@ -679,10 +684,8 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
             with st.spinner(f"పెద్ద మీడియా ఫైల్ ({fn}) ప్రాసెస్ అవుతోంది... దయచేసి వేచి ఉండండి..."):
                 try:
                     c = genai.Client(api_key=active_keys[0])
-                    # Corrected SDK upload call without invalid mime_type keyword
                     up_ref = c.files.upload(file=tmp_path)
                     
-                    # Wait for video processing if necessary
                     if "video" in fm:
                         while up_ref.state.name == "PROCESSING":
                             time.sleep(2)
@@ -767,7 +770,7 @@ if st.session_state.get("is_finalized", False):
     final_content = st.session_state.get("final_note", "")
     
     st.divider()
-    st.subheader("📄 అధికారిక లెటర్‌‌హెడ్ వీక్షణ (Official Letterhead View)")
+    st.subheader("📄 అధికారిక లెటర్‌హెడ్ వీక్షణ (Official Letterhead View)")
     
     if lh_banner_base64:
         banner_img_html = f'<img src="data:image/png;base64,{lh_banner_base64}" class="letterhead-banner-img" alt="Official Letterhead">'
