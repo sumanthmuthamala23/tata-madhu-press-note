@@ -1,12 +1,10 @@
 import os
-import time
 import base64
 import tempfile
 import urllib.parse
 import streamlit as st
 from google import genai
 from google.genai import types
-from google.genai.errors import APIError
 
 # Page setup
 st.set_page_config(
@@ -62,7 +60,7 @@ st.markdown(f"""
     .stTextInput>div>div>input, .stTextArea>div>div>textarea {{
         background-color: #ffffff !important;
         color: #111111 !important;
-        border: 1.5px solid #e2e8f0 !important;
+        border: 1.5px solid #cbd5e1 !important;
         border-radius: 8px !important;
     }}
 
@@ -124,32 +122,44 @@ STRICT CONSTRAINTS:
 def get_client(api_key: str):
     return genai.Client(api_key=api_key)
 
-# Robust Multi-Model Call (Prevents ServerError and Model Not Found)
+# Dynamic Model Resolver: Checks which models exist on your key to prevent 404 forever
+@st.cache_data(show_spinner=False, ttl=3600)
+def resolve_best_model(_client: genai.Client):
+    # Candidate list in priority order
+    preferred = [
+        "gemini-3.8-flash",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-exp",
+    ]
+    try:
+        available_models = [m.name.replace("models/", "") for m in _client.models.list()]
+        for p in preferred:
+            if p in available_models:
+                return p
+        # If none of preferred matched, pick any available flash or general model
+        flash_models = [m for m in available_models if "flash" in m]
+        if flash_models:
+            return flash_models[0]
+        return available_models[0]
+    except Exception:
+        # Safe default
+        return "gemini-3.8-flash"
+
 def generate_safe_content(client: genai.Client, contents, system_instruction=None, temperature=0.3):
-    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
-    last_error = None
+    model_name = resolve_best_model(client)
     
-    for model_name in models_to_try:
-        try:
-            config = types.GenerateContentConfig(
-                temperature=temperature,
-            )
-            if system_instruction:
-                config.system_instruction = system_instruction
-                
-            response = client.models.generate_content(
-                model=model_name,
-                contents=contents,
-                config=config,
-            )
-            if response.text:
-                return response.text
-        except Exception as e:
-            last_error = e
-            time.sleep(1)
-            continue
-            
-    raise last_error
+    config = types.GenerateContentConfig(
+        temperature=temperature,
+    )
+    if system_instruction:
+        config.system_instruction = system_instruction
+        
+    response = client.models.generate_content(
+        model=model_name,
+        contents=contents,
+        config=config,
+    )
+    return response.text
 
 # English to Telugu Transliteration Function
 def transliterate_to_telugu(client: genai.Client, english_text: str):
@@ -179,7 +189,6 @@ with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/240px-BRS_Car_Symbol.png", width=80)
     st.title("సెట్టింగ్స్ (Settings)")
     
-    # Retrieve Secret or user input
     default_key = ""
     try:
         if hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
@@ -200,7 +209,6 @@ with st.sidebar:
         help="స్టేట్‌మెంట్ విడుదల చేసే స్థలం (ఉదా: హైదరాబాద్, ఖమ్మం, శాసనమండలి, ఢిల్లీ)."
     )
     
-    # Your requested 10 Topic Scopes
     topic_scopes = [
         "ప్రజా సమస్యలు & వినతులు (Public Grievances & Demands)",
         "ప్రభుత్వ విధానాలు / విమర్శలు (State Govt Policies / Criticisms)",
@@ -247,7 +255,7 @@ with tab1:
         )
 
 with tab2:
-    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్ అప్‌‌లోడ్ చేయండి:")
+    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్ అప్‌లోడ్ చేయండి:")
     uploaded_file = st.file_uploader(
         "సపోర్ట్ ఫార్మాట్లు: MP3, WAV, M4A, MP4", 
         type=["mp3", "wav", "m4a", "mp4"]
@@ -275,7 +283,7 @@ with tab3:
     with st.expander("🔤 ఇంగ్లీష్/టాంగ్లీష్‌లో టైప్ చేసి తెలుగులోకి మార్చండి", expanded=True):
         raw_eng = st.text_area(
             "ఇంగ్లీష్ లేదా టాంగ్లీష్ (Tanglish) లో టైప్ చేయండి:",
-            placeholder="ఉదాహరణ: Rythu bandhu raledhu, Tata Madhu garu mandapaddaru...",
+            placeholder="ఉదాహరణ: rythu bandu inka raledu, Tata Madhu garu mandapaddaru...",
             height=80,
             key="raw_eng_text"
         )
@@ -286,6 +294,7 @@ with tab3:
                         telugu_converted = transliterate_to_telugu(client, raw_eng)
                         st.session_state["telugu_notes"] = telugu_converted.strip()
                         st.success("✅ విజయవంతంగా తెలుగులోకి మారింది!")
+                        st.rerun()
                     except Exception as err:
                         st.error(f"మార్పిడి ఎర్రర్: {str(err)}")
             else:
@@ -338,7 +347,7 @@ if "generated_note" in st.session_state:
     col1, col2 = st.columns(2)
     with col1:
         st.download_button(
-            label="📥 టెక్స్ట్ ఫైల్‌‌గా డౌన్‌లోడ్ చేయండి",
+            label="📥 టెక్స్ట్ ఫైల్‌గా డౌన్‌లోడ్ చేయండి",
             data=st.session_state["generated_note"],
             file_name=f"Tata_Madhu_Press_Note_{location.split()[0]}.txt",
             mime="text/plain",
