@@ -128,9 +128,28 @@ RULES:
 def get_client(api_key: str):
     return genai.Client(api_key=api_key)
 
+def transliterate_to_telugu(client: genai.Client, english_text: str):
+    """Accurately converts phonetically typed English (Thanglish/English notes) into flawless literary Telugu."""
+    transliterate_prompt = f"""
+    Convert the following text typed in English/Tanglish into grammatically correct, natural, error-free Telugu text (తెలుగు లిపి).
+    If English words are used phonetically (e.g. 'khammam lo rythu bandhu raledu'), write them in proper Telugu script ('ఖమ్మంలో రైతు బంధు రాలేదు').
+    Maintain proper political and administrative vocabulary. Output ONLY the Telugu converted text without explanations.
+
+    Input:
+    {english_text}
+    """
+    response = client.models.generate_content(
+        model="gemini-3.8-flash",
+        contents=transliterate_prompt,
+        config=types.GenerateContentConfig(
+            temperature=0.1,
+        ),
+    )
+    return response.text.strip()
+
 def generate_press_note(client: genai.Client, parts: list, occasion: str, location: str):
     prompt_context = f"""
-    సందర్భం (Occasion / Context): {occasion}
+    సందర్భం / విభాగం (Topic Scope): {occasion}
     స్థలం (Location): {location}
     దయచేసి పైన పేర్కొన్న వివరాలు మరియు అందించిన ఆడియో/వీడియో/నోట్స్ ఆధారంగా ఎమ్మెల్సీ తాతా మధుసూదన్ గారి అధికారిక తెలుగు పత్రికా ప్రకటనను రూపొందించండి.
     """
@@ -172,18 +191,21 @@ with st.sidebar:
         help="స్టేట్‌మెంట్ ఎక్కడి నుండి విడుదల చేస్తున్నారో రాయండి (ఉదా: హైదరాబాద్, ఖమ్మం, ఢిల్లీ, శాసనమండలి మొదలైనవి)."
     )
     
-    occasion = st.selectbox(
-        "ప్రకటన విభాగం / స్వభావం (Topic Scope)",
-        [
-            "రాష్ట్ర స్థాయి విధానాలు & ప్రభుత్వ వైఫల్యాలు (State Govt Policies / Criticisms)",
-            "శాసనమండలి సమావేశాలు / స్పీచ్ (Legislative Council Proceedings)",
-            "రైతు సంక్షేమం & వ్యవసాయ విధానాలు (Agriculture / Rythu Issues)",
-            "పార్టీ రాజకీయాలు & జాతీయ అంశాలు (BRS Party / National Politics)",
-            "ప్రజా సమస్యలు & విపత్తుల నిర్వహణ (Public Grievances / Inspections)",
-            "మీడియా సమావేశం / కౌంటర్ అటాక్ (State Press Meet / Counter)",
-            "సంతాపం / ప్రత్యేక శుభాకాంక్షలు (Condolences / Greetings)"
-        ]
-    )
+    # Custom Topic Scopes
+    topic_scopes = [
+        "ప్రజా సమస్యలు & వినతులు (Public Grievances & Demands)",
+        "ప్రభుత్వ విధానాలు / విమర్శలు (State Govt Policies / Criticisms)",
+        "రైతాంగ & వ్యవసాయ సమస్యలు (Farmers & Agriculture Issues)",
+        "శాసనమండలి ప్రసంగాలు / ప్రశ్నలు (Council Speeches & Legislative Issues)",
+        "నియోజకవర్గ అభివృద్ధి & నిధులు (Constituency Development & Sanctions)",
+        "పార్టీ కార్యక్రమాలు & సమావేశాలు (Party Meetings & Organizational)",
+        "నిరసనలు, ధర్నాలు & పోరాటాలు (Protests & Agitations)",
+        "అధికారులతో సమీక్షలు / వినతులు (Official Reviews & Representations)",
+        "సేవా కార్యక్రమాలు & సంక్షేమం (Social Welfare & Charity)",
+        "శుభాకాంక్షలు & సంతాపాలు (Greetings & Condolences)",
+    ]
+
+    selected_scope = st.selectbox("ప్రకటన విభాగం / స్వభావం (Topic Scope)", topic_scopes)
 
 # ----------------- MAIN UI -----------------
 st.title("🎙️ ఎమ్మెల్సీ తాతా మధుసూదన్ - పత్రికా ప్రకటన జనరేటర్")
@@ -194,6 +216,10 @@ if not api_key_input:
     st.stop()
 
 client = get_client(api_key_input)
+
+# Maintain persistent notes in session_state
+if "current_notes" not in st.session_state:
+    st.session_state["current_notes"] = ""
 
 # Input Tabs
 tab1, tab2, tab3 = st.tabs(["🎤 లైవ్ రికార్డింగ్ (Mic)", "📁 ఆడియో / వీడియో అప్‌లోడ్", "✍️ సిట్యుయేషన్ నోట్స్ (Text)"])
@@ -235,11 +261,29 @@ with tab2:
         st.success(f"✅ {uploaded_file.name} సిద్ధంగా ఉంది.")
 
 with tab3:
-    st.markdown("##### సందర్భం లేదా ముఖ్యమైన పాయింట్లు టైప్ చేయండి:")
+    st.markdown("##### ఇంగ్లీష్ నుండి తెలుగులోకి మార్పిడి (English to Telugu Typing):")
+    with st.expander("🔤 ఇంగ్లీష్‌లో టైప్ చేసి తెలుగులోకి మార్చండి (Phonetic Transliteration)", expanded=False):
+        raw_eng = st.text_area(
+            "ఇంగ్లీష్ లేదా టాంగ్లీష్ (Tanglish) లో టైప్ చేయండి:",
+            placeholder="ఉదాహరణ: Khammam lo rythu bandhu raledu, Tata Madhu garu mandapaddaru...",
+            height=90,
+            key="eng_input"
+        )
+        if st.button("తెలుగులోకి మార్చండి (Convert to Telugu)"):
+            if raw_eng.strip():
+                with st.spinner("తెలుగులోకి మారుస్తోంది..."):
+                    converted_tel = transliterate_to_telugu(client, raw_eng)
+                    st.session_state["current_notes"] = converted_tel
+                    st.success("✅ విజయవంతంగా తెలుగులోకి మారింది!")
+            else:
+                st.warning("దయచేసి ఏదైనా టెక్స్ట్ టైప్ చేయండి.")
+
+    st.markdown("##### పత్రికా ప్రకటన కోసం ముఖ్యాంశాలు / సిట్యుయేషన్ నోట్స్:")
     notes_text = st.text_area(
-        "వివరాలు / పాయింట్లు",
-        placeholder="ఉదాహరణ: రైతుల సమస్యలపై శాసనమండలిలో గళమెత్తిన ఎమ్మెల్సీ తాతా మధు. రుణమాఫీ వెంటనే పూర్తి చేయాలని డిమాండ్...",
-        height=140
+        "వివరాలు / పాయింట్లు (ఇక్కడ సరిచూసుకోవచ్చు లేదా నేరుగా టైప్ చేయవచ్చు):",
+        value=st.session_state.get("current_notes", ""),
+        height=140,
+        key="telugu_notes_input"
     )
     if notes_text.strip():
         input_parts.append(types.Part.from_text(text=notes_text))
@@ -252,7 +296,7 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
     else:
         with st.spinner("ఎమ్మెల్సీ గారి పత్రికా ప్రకటన సిద్ధమవుతోంది..."):
             try:
-                press_note_telugu = generate_press_note(client, input_parts, occasion, location)
+                press_note_telugu = generate_press_note(client, input_parts, selected_scope, location)
                 st.session_state["generated_note"] = press_note_telugu
             except Exception as e:
                 st.error(f"ఎర్రర్ సంభవించింది: {str(e)}")
