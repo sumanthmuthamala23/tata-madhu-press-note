@@ -29,7 +29,6 @@ def get_base64_image(image_path):
     return None
 
 bg_image_base64 = get_base64_image("background.png")
-letterhead_base64 = get_base64_image("letterhead.png") or get_base64_image("letter head(2).jpg")
 
 if bg_image_base64:
     bg_style = f"""
@@ -73,7 +72,6 @@ st.markdown(f"""
         border-radius: 8px !important;
     }}
 
-    /* Official Letterhead Replica Container */
     .letterhead-container {{
         background-color: #ffffff;
         border: 1px solid #d1d5db;
@@ -232,8 +230,6 @@ def generate_ai_response(keys: list, contents_list: list, system_instruction=SYS
 # DOCX Generator
 def create_docx_press_note(text: str, date_str: str, location_str: str) -> io.BytesIO:
     doc = Document()
-    
-    # Official Header
     p_header = doc.add_paragraph()
     run_name = p_header.add_run("TATA MADHUSUDHAN\n")
     run_name.font.name = "Arial"
@@ -256,11 +252,9 @@ def create_docx_press_note(text: str, date_str: str, location_str: str) -> io.By
     
     doc.add_paragraph("―" * 55)
     
-    # Date & Place
     p_meta = doc.add_paragraph(f"స్థలం: {location_str} | తేదీ: {date_str}\n")
     p_meta.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     
-    # Body Content
     for line in text.split("\n"):
         if line.strip():
             p = doc.add_paragraph(line.strip())
@@ -393,24 +387,26 @@ with st.sidebar:
         help="Google AI Studio API Key ఇక్కడ నమోదు చేయండి."
     )
     
-    # Date Picker Component
     st.markdown("##### 📅 ప్రకటన తేదీ (Date):")
     selected_date = st.date_input("తేదీని ఎంచుకోండి", value=datetime.date.today())
     formatted_date = selected_date.strftime("%d-%m-%Y")
     
-    # Location with Instant Telugu Converter
-    st.markdown("##### 📍 స్థలం / వేదిక (Location / Venue):")
-    if "location_input_val" not in st.session_state:
-        st.session_state["location_input_val"] = "హైదరాబాద్ / ఖమ్మం"
+    # Robust Location Selection & Transliteration
+    st.markdown("##### 📍 స్థలం / వేదిక (Location):")
+    if "final_loc_key" not in st.session_state:
+        st.session_state["final_loc_key"] = "ఖమ్మం"
         
-    loc_eng = st.text_input("ఇంగ్లీష్‌లో టైప్ చేయండి:", placeholder="e.g. Khammam, Palair, Hyderabad...", key="loc_eng_raw")
-    if st.button("తెలుగులోకి మార్చండి (Convert Location)"):
+    loc_eng = st.text_input("ఇంగ్లీష్‌లో టైప్ చేయండి:", placeholder="e.g. Khammam, Palair, Hyderabad...", key="loc_eng_input")
+    if st.button("🔄 స్థలాన్ని తెలుగులోకి మార్చండి"):
         if loc_eng.strip():
             converted_loc = google_transliterate_telugu(loc_eng)
-            st.session_state["location_input_val"] = converted_loc
+            st.session_state["final_loc_key"] = converted_loc
             st.rerun()
 
-    final_location = st.text_input("ఫైనల్ స్థలం (Telugu Location):", value=st.session_state["location_input_val"], key="final_loc_key")
+    final_location = st.text_input(
+        "ఫైనల్ స్థలం (Telugu Location):", 
+        key="final_loc_key"
+    )
 
     # 10 Topic Scopes
     topic_scopes = [
@@ -586,7 +582,6 @@ if st.session_state.get("is_finalized", False):
     st.divider()
     st.subheader("📄 అధికారిక లెటర్‌హెడ్ వీక్షణ (Official Letterhead View)")
     
-    # Official Letterhead HTML View Matching Reference 1
     st.markdown(f"""
     <div class="letterhead-container">
         <table class="lh-header-table">
@@ -621,7 +616,6 @@ if st.session_state.get("is_finalized", False):
     
     st.write("")
     
-    # Multi-format Downloads (DOCX / HTML-Print / Text)
     col_d1, col_d2, col_d3 = st.columns(3)
     
     with col_d1:
