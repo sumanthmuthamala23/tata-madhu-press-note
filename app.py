@@ -120,22 +120,24 @@ SYSTEM_INSTRUCTION = (
     "   - విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం\n"
 )
 
-# 100% Reliable Google Input Tools Transliteration (Free, Instant, No Model Errors)
+# Robust Transliteration Function with Proper User-Agent Headers
 def google_transliterate_telugu(text: str) -> str:
     if not text.strip():
         return ""
     words = text.split()
     converted_words = []
     url = "https://inputtools.google.com/request?text={}&itc=te-t-i0-und&num=1"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)"
+    }
     
     for word in words:
-        # Keep punctuation or pure English numbers as-is
-        if word.isdigit() or word in [",", ".", "!", "?", "-", ":"]:
+        if word.isdigit() or word in [",", ".", "!", "?", "-", ":", ";"]:
             converted_words.append(word)
             continue
         try:
             req_url = url.format(urllib.parse.quote(word))
-            res = requests.get(req_url, timeout=4)
+            res = requests.get(req_url, headers=headers, timeout=5)
             data = res.json()
             if data[0] == "SUCCESS" and len(data[1][0][1]) > 0:
                 converted_words.append(data[1][0][1][0])
@@ -158,7 +160,6 @@ def generate_press_note(client: genai.Client, parts: list, occasion: str, locati
     )
     parts.append(prompt_context)
     
-    # Stable 2.5 Flash execution
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=parts,
@@ -222,8 +223,9 @@ except Exception as e:
     st.error(f"API Client ఎర్రర్: {str(e)}")
     st.stop()
 
-if "telugu_notes" not in st.session_state:
-    st.session_state["telugu_notes"] = ""
+# Initialize session state for the notes box correctly
+if "final_notes_area" not in st.session_state:
+    st.session_state["final_notes_area"] = ""
 
 tab1, tab2, tab3 = st.tabs(["🎤 లైవ్ రికార్డింగ్ (Mic)", "📁 ఆడియో / వీడియో అప్‌లోడ్", "✍️ సిట్యుయేషన్ నోట్స్ (Text)"])
 
@@ -268,25 +270,25 @@ with tab3:
     with st.expander("🔤 ఇంగ్లీష్/టాంగ్లీష్‌లో టైప్ చేసి తెలుగులోకి మార్చండి", expanded=True):
         raw_eng = st.text_area(
             "ఇంగ్లీష్ లేదా టాంగ్లీష్ (Tanglish) లో టైప్ చేయండి:",
-            placeholder="ఉదాహరణ: rythu bandhu inka raledu, Tata Madhu garu mandapaddaru...",
-            height=80,
+            placeholder="ఉదాహరణ: Rythu Bandu inka Raledu, Tata Madhu garu mandapaddaru...",
+            height=85,
             key="raw_eng_text"
         )
         if st.button("🔄 తెలుగులోకి మార్చండి (Convert to Telugu)"):
             if raw_eng.strip():
-                with st.spinner("ఖచ్చితమైన తెలుగులోకి మారుస్తోంది..."):
+                with st.spinner("తెలుగులోకి మారుస్తోంది..."):
                     converted = google_transliterate_telugu(raw_eng)
-                    st.session_state["telugu_notes"] = converted
-                    st.success("✅ విజయవంతంగా తెలుగులోకి మారింది!")
+                    # Directly update the widget state to prevent Streamlit widget freeze
+                    st.session_state["final_notes_area"] = converted
                     st.rerun()
             else:
                 st.warning("దయచేసి ఇంగ్లీష్‌లో టెక్స్ట్ టైప్ చేయండి.")
 
     st.markdown("##### పత్రికా ప్రకటన కోసం ముఖ్యాంశాలు (Notes):")
+    # Controlled strictly via session_state key
     notes_text = st.text_area(
         "తెలుగు వివరాలు (నేరుగా ఇక్కడ సవరించుకోవచ్చు):",
-        value=st.session_state["telugu_notes"],
-        height=130,
+        height=140,
         key="final_notes_area"
     )
     if notes_text.strip():
@@ -350,7 +352,6 @@ if st.session_state.get("is_finalized", False):
     st.write("")
     st.subheader("🌐 సోషల్ మీడియా పోస్టులు (Ready to Copy & Paste)")
     
-    # Extract clean lines for platform formatting
     lines = [line.strip() for line in final_content.split("\n") if line.strip()]
     headline = lines[0] if lines else "ఎమ్మెల్సీ తాతా మధుసూదన్ గారి ప్రకటన"
     for l in lines:
@@ -360,26 +361,21 @@ if st.session_state.get("is_finalized", False):
             
     summary_body = "\n".join(lines[1:5]) if len(lines) > 1 else final_content
 
-    # Platform specific texts
     whatsapp_text = f"*{headline}*\n\n{final_content}\n\n_విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం_"
-    
     twitter_text = f"🚨 {headline[:180]}\n\n- ఎమ్మెల్సీ తాతా మధుసూదన్\n\n#TataMadhu #BRSParty #Telangana #Khammam"
-    
     facebook_text = f"📌 {headline}\n\n{final_content}\n\n#TataMadhusudhan #TataMadhu #BRS #Khammam #TelanganaPolitics"
-    
     instagram_text = f"📢 {headline}\n.\n.\n{summary_body[:400]}...\n.\n.\n#TataMadhu #MLCTataMadhu #BRS #Khammam #Telangana #PrajaGontuka"
-    
     youtube_text = f"TITLE:\n{headline} | MLC Tata Madhusudhan Speech\n\nDESCRIPTION:\n{final_content}\n\n#TataMadhu #BRS #TelanganaNews #MLCSpeech"
 
     st1, st2, st3, st4, st5 = st.tabs(["🟢 WhatsApp", "🔵 Twitter (X)", "🔷 Facebook", "📸 Instagram", "🔴 YouTube"])
     
     with st1:
-        st.text_area("WhatsApp Text (నేరుగా పేస్ట్ చేయవచ్చు):", value=whatsapp_text, height=200)
+        st.text_area("WhatsApp Text:", value=whatsapp_text, height=200)
         wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(whatsapp_text[:1400])}"
         st.link_button("📲 వాట్సాప్‌లో షేర్ చేయండి", wa_url, use_container_width=True)
         
     with st2:
-        st.text_area("Twitter (X) Post (క్యారెక్టర్ పరిమితికి అనుగుణంగా):", value=twitter_text, height=140)
+        st.text_area("Twitter (X) Post:", value=twitter_text, height=140)
         x_url = f"https://twitter.com/intent/tweet?text={urllib.parse.quote(twitter_text)}"
         st.link_button("🐦 X (Twitter) లో పోస్ట్ చేయండి", x_url, use_container_width=True)
 
