@@ -1,4 +1,5 @@
 import os
+import base64
 import tempfile
 import urllib.parse
 import streamlit as st
@@ -12,56 +13,89 @@ st.set_page_config(
     layout="wide",
 )
 
-# Custom Styling with Background Theme
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Suranna&family=Ramabhadra&display=swap');
-    
-    /* Full App Page Background with Soft Telangana Pink Tint */
+# Function to load and encode local image to base64
+def get_base64_image(image_path):
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    return None
+
+bg_image_base64 = get_base64_image("background.png")
+
+# Background CSS: uses background.png if present, with soft overlay for legibility
+if bg_image_base64:
+    bg_style = f"""
+    .stApp {{
+        background: linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.88)),
+                    url("data:image/png;base64,{bg_image_base64}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    """
+else:
+    bg_style = """
     .stApp {
         background: linear-gradient(135deg, #fff5f8 0%, #ffedf2 40%, #ffffff 100%);
         background-attachment: fixed;
     }
+    """
+
+# Custom Styling with Anek Telugu Font
+st.markdown(f"""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@300;400;500;600;700;800&display=swap');
     
+    {bg_style}
+    
+    /* Global Font Overrides */
+    html, body, [class*="css"] {{
+        font-family: 'Anek Telugu', sans-serif;
+    }}
+
     /* Left Sidebar Styling */
-    section[data-testid="stSidebar"] {
-        background-color: #fff0f4;
+    section[data-testid="stSidebar"] {{
+        background-color: rgba(255, 240, 244, 0.95);
         border-right: 1px solid #ffd1dc;
-    }
+        font-family: 'Anek Telugu', sans-serif;
+    }}
 
     /* Official Letterhead Output Box */
-    .press-box {
-        background-color: #ffffff;
+    .press-box {{
+        background-color: rgba(255, 255, 255, 0.96);
         border: 2px solid #b82329;
-        border-radius: 10px;
+        border-radius: 12px;
         padding: 30px;
-        box-shadow: 0 8px 24px rgba(184, 35, 41, 0.08);
+        box-shadow: 0 8px 24px rgba(184, 35, 41, 0.10);
         color: #111111;
-        line-height: 1.85;
-        font-family: 'Suranna', serif;
-    }
+        line-height: 1.9;
+        font-family: 'Anek Telugu', sans-serif;
+        font-size: 17px;
+    }}
     
-    .press-header {
+    .press-header {{
         text-align: center;
         border-bottom: 2px dashed #b82329;
         padding-bottom: 14px;
         margin-bottom: 22px;
-    }
+    }}
     
-    .leader-title {
+    .leader-title {{
         color: #dc2626;
-        font-size: 26px;
-        font-weight: 700;
+        font-size: 28px;
+        font-weight: 800;
         margin: 0;
-        font-family: 'Ramabhadra', sans-serif;
-    }
+        font-family: 'Anek Telugu', sans-serif;
+    }}
     
-    .party-title {
+    .party-title {{
         color: #374151;
-        font-size: 15px;
+        font-size: 16px;
         margin-top: 4px;
         font-weight: 600;
-    }
+        font-family: 'Anek Telugu', sans-serif;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -162,7 +196,7 @@ if not api_key_input:
 client = get_client(api_key_input)
 
 # Input Tabs
-tab1, tab2, tab3 = st.tabs(["🎤 లైవ్ రికార్డింగ్ (Mic)", "📁 ఆడియో / వీడియో అప్‌‌లోడ్", "✍️ సిట్యుయేషన్ నోట్స్ (Text)"])
+tab1, tab2, tab3 = st.tabs(["🎤 లైవ్ రికార్డింగ్ (Mic)", "📁 ఆడియో / వీడియో అప్‌లోడ్", "✍️ సిట్యుయేషన్ నోట్స్ (Text)"])
 
 input_parts = []
 
@@ -236,7 +270,7 @@ if "generated_note" in st.session_state:
         <div>
             {st.session_state["generated_note"].replace(chr(10), '<br>')}
         </div>
-        <div style="border-top: 1px dashed #dc2626; margin-top: 25px; padding-top: 10px; text-align: right; font-size: 13px; color: #555;">
+        <div style="border-top: 1px dashed #dc2626; margin-top: 25px; padding-top: 10px; text-align: right; font-size: 14px; font-weight: 600; color: #555;">
             విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం
         </div>
     </div>
@@ -247,7 +281,7 @@ if "generated_note" in st.session_state:
     col1, col2 = st.columns(2)
     with col1:
         st.download_button(
-            label="📥 టెక్స్ట్ ఫైల్‌‌గా డౌన్‌లోడ్ చేయండి",
+            label="📥 టెక్స్ట్ ఫైల్‌గా డౌన్‌లోడ్ చేయండి",
             data=st.session_state["generated_note"],
             file_name=f"Tata_Madhu_Press_Note_{location.split()[0]}.txt",
             mime="text/plain",
