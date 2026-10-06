@@ -8,6 +8,7 @@ import datetime
 import urllib.parse
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image
 from docx import Document
 from docx.shared import Pt, RGBColor
@@ -76,7 +77,7 @@ else:
     }
     """
 
-# Custom CSS with Anek Telugu Font & Mobile WebSocket Keepalive
+# Custom CSS with Anek Telugu Font & Material Symbol Fixes
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@300;400;500;600;700;800&display=swap');
@@ -577,9 +578,8 @@ if not api_key_input:
 if "final_notes_area" not in st.session_state:
     st.session_state["final_notes_area"] = ""
 
-# Persistent container for files across mobile browser redraws
-if "saved_audio_bytes" not in st.session_state:
-    st.session_state["saved_audio_bytes"] = []
+if "mobile_attached_audio" not in st.session_state:
+    st.session_state["mobile_attached_audio"] = []
 
 tab1, tab2, tab3 = st.tabs(["🎤 లైవ్ రికార్డింగ్ (Mic)", "📁 ఆడియో / వీడియో అప్‌లోడ్", "✍️ సిట్యుయేషన్ నోట్స్ (Text)"])
 
@@ -598,72 +598,98 @@ with tab1:
 with tab2:
     st.markdown("##### ఆడియో లేదా వీడియో ఫైల్ అప్‌లోడ్ చేయండి:")
 
-    col_m1, col_m2 = st.columns([1, 1])
-    with col_m1:
-        upload_mode = st.radio(
-            "అప్‌లోడ్ మోడ్ ఎంచుకోండి (Mode):",
-            ["📱 మొబైల్ సింగిల్ రికార్డింగ్ (Single Recording)", "💻 మల్టీ-ఫైల్ బ్యాచ్ (Multiple Files)"],
-            index=0
-        )
-
-    is_multi = "Multiple" in upload_mode
-
-    # Use clean accept criteria that matches mobile audio intents
-    uploaded_files = st.file_uploader(
-        "రికార్డింగ్ ఫైల్ ఎంచుకోండి (.m4a, .mp3, .wav, .mp4):",
-        type=["m4a", "mp3", "wav", "aac", "mp4", "ogg", "opus", "caf", "mov"],
-        accept_multiple_files=is_multi,
-        key=f"uploader_{is_multi}"
+    # Primary Direct Uploader (Works reliably on all devices)
+    direct_file = st.file_uploader(
+        "మొబైల్ రికార్డింగ్ లేదా ఆడియో ఫైల్ ఎంచుకోండి (.m4a, .mp3, .wav):",
+        type=None,
+        key="primary_file_uploader"
     )
 
-    # Process files
-    raw_file_list = []
-    if uploaded_files:
-        if isinstance(uploaded_files, list):
-            raw_file_list = uploaded_files
+    if direct_file:
+        f_bytes = direct_file.read()
+        f_name = direct_file.name
+        fn_low = f_name.lower()
+
+        if fn_low.endswith((".m4a", ".aac")) or "m4a" in (direct_file.type or "").lower():
+            c_mime = "audio/mp4"
+        elif fn_low.endswith(".mp3"):
+            c_mime = "audio/mp3"
+        elif fn_low.endswith(".wav"):
+            c_mime = "audio/wav"
+        elif fn_low.endswith((".ogg", ".opus")):
+            c_mime = "audio/ogg"
+        elif fn_low.endswith((".mp4", ".m4v")):
+            c_mime = "video/mp4"
+        elif fn_low.endswith(".mov"):
+            c_mime = "video/quicktime"
         else:
-            raw_file_list = [uploaded_files]
+            c_mime = "audio/mp4"
 
-    if raw_file_list:
-        st.session_state["saved_audio_bytes"] = []
-        for uf in raw_file_list:
-            f_bytes = uf.read()
-            fn_low = uf.name.lower()
+        st.session_state["mobile_attached_audio"] = [(f_name, f_bytes, c_mime)]
+        st.success(f"✅ ఫైల్ విజయవంతంగా అటాచ్ అయ్యింది: **{f_name}** ({len(f_bytes)/(1024*1024):.2f} MB)")
 
-            if fn_low.endswith((".m4a", ".aac")) or "m4a" in (uf.type or "").lower():
-                c_mime = "audio/mp4"
-            elif fn_low.endswith(".mp3"):
-                c_mime = "audio/mp3"
-            elif fn_low.endswith(".wav"):
-                c_mime = "audio/wav"
-            elif fn_low.endswith((".ogg", ".opus")):
-                c_mime = "audio/ogg"
-            elif fn_low.endswith((".mp4", ".m4v")):
-                c_mime = "video/mp4"
-            elif fn_low.endswith(".mov"):
-                c_mime = "video/quicktime"
-            else:
-                c_mime = "audio/mp4"
+    # Secondary Direct HTML5 Mobile Bypass (for Android WebView / Call Recorder storage locks)
+    with st.expander("📱 మొబైల్ ఫోన్ డైరెక్ట్ సెలెక్టర్ (Use this if the above box resets on phone)", expanded=False):
+        st.caption("ఈ కింద ఉన్న బటన్ ద్వారా ఫోన్‌లోని కాల్ రికార్డింగ్ / వాయిస్ మెమో నేరుగా బ్రౌజర్‌లోకి లోడ్ అవుతుంది.")
+        
+        bridge_html = """
+        <div style="font-family: sans-serif; padding: 10px; background: #fff1f5; border: 2px dashed #be123c; border-radius: 10px; text-align: center;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #be123c;">మొబైల్ ఆడియో ఫైల్‌ను ఇక్కడ ఎంచుకోండి (.m4a / .mp3):</p>
+            <input type="file" id="mobile_file_input" accept="audio/*,video/*,.m4a,.mp3,.wav" style="font-size: 15px; padding: 8px;" />
+            <p id="status_msg" style="margin-top: 8px; font-size: 13px; color: #475569;"></p>
+        </div>
+        <script>
+            const input = document.getElementById('mobile_file_input');
+            const status = document.getElementById('status_msg');
+            input.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                status.innerText = "ఫైల్ చదువుతోంది: " + file.name + "...";
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    const base64Data = evt.target.result.split(',')[1];
+                    const payload = {
+                        name: file.name,
+                        mime: file.type || 'audio/mp4',
+                        data: base64Data
+                    };
+                    window.parent.postMessage({
+                        type: 'streamlit:setComponentValue',
+                        value: payload
+                    }, '*');
+                    status.innerText = "✅ " + file.name + " సిద్ధంగా ఉంది!";
+                };
+                reader.readAsDataURL(file);
+            });
+        </script>
+        """
+        bridge_data = components.html(bridge_html, height=130)
 
+        # Check for fallback bridge data
+        if bridge_data and isinstance(bridge_data, dict) and "data" in bridge_data:
+            b_name = bridge_data.get("name", "mobile_recording.m4a")
+            b_mime = bridge_data.get("mime", "audio/mp4")
+            raw_b = base64.b64decode(bridge_data["data"])
+            st.session_state["mobile_attached_audio"] = [(b_name, raw_b, b_mime)]
+            st.success(f"✅ మొబైల్ డైరెక్ట్ ఫైల్ లోడ్ అయ్యింది: **{b_name}**")
+
+    # If file exists in session, process it for Gemini
+    if st.session_state.get("mobile_attached_audio"):
+        for f_name, f_bytes, c_mime in st.session_state["mobile_attached_audio"]:
             if len(f_bytes) > 20 * 1024 * 1024:
-                file_ext = os.path.splitext(uf.name)[1] or ".m4a"
+                file_ext = os.path.splitext(f_name)[1] or ".m4a"
                 with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
                     tmp.write(f_bytes)
                     tmp_path = tmp.name
-                with st.spinner(f"పెద్ద ఫైల్ అప్‌లోడ్ అవుతోంది ({uf.name})..."):
+                with st.spinner(f"పెద్ద ఫైల్ అప్‌లోడ్ అవుతోంది ({f_name})..."):
                     c = genai.Client(api_key=active_keys[0])
                     up_ref = c.files.upload(file=tmp_path, mime_type=c_mime)
-                    st.session_state["saved_audio_bytes"].append(up_ref)
+                    input_parts.append(up_ref)
                     os.remove(tmp_path)
             else:
-                st.session_state["saved_audio_bytes"].append(
+                input_parts.append(
                     types.Part.from_bytes(data=f_bytes, mime_type=c_mime)
                 )
-
-        st.success(f"✅ {len(raw_file_list)} ఆడియో/వీడియో ఫైల్(లు) విజయవంతంగా లోడ్ అయ్యాయి!")
-
-    if st.session_state.get("saved_audio_bytes"):
-        input_parts.extend(st.session_state["saved_audio_bytes"])
 
 with tab3:
     st.markdown("##### ఇంగ్లీష్ ➔ తెలుగు మార్పిడి (English Typing to Telugu):")
@@ -696,7 +722,7 @@ st.divider()
 
 if st.button("🚀 పత్రికా ప్రకటనను రూపొందించండి (Generate Press Note)", type="primary", use_container_width=True):
     if not input_parts:
-        st.error("⚠️️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
+        st.error("⚠️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
     else:
         with st.spinner("అధికారిక ప్రెస్ నోట్ సిద్ధమవుతోంది..."):
             try:
@@ -874,7 +900,7 @@ if st.session_state.get("is_finalized", False):
     with st1:
         st.text_area("WhatsApp Text:", value=whatsapp_text, height=200)
         wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(whatsapp_text[:1400])}"
-        st.link_button("📲 వాట్సాప్‌లో షేర్ చేయండి", wa_url, use_container_width=True)
+        st.link_button("📲 వాట్సాప్‌‌లో షేర్ చేయండి", wa_url, use_container_width=True)
         
     with st2:
         st.text_area("Twitter (X) Post:", value=twitter_text, height=140)
