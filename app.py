@@ -121,7 +121,7 @@ SYSTEM_INSTRUCTION = (
     "   - విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం\n"
 )
 
-# 100% Reliable Google Input Tools Transliteration
+# Google Input Tools Transliteration
 def google_transliterate_telugu(text: str) -> str:
     if not text.strip():
         return ""
@@ -149,11 +149,8 @@ def google_transliterate_telugu(text: str) -> str:
             
     return " ".join(converted_words)
 
-def get_client(api_key: str):
-    return genai.Client(api_key=api_key)
-
-# Dynamic resilient generation with automatic model discovery and multi-attempt failover
-def generate_press_note_resilient(client: genai.Client, parts: list, occasion: str, location: str):
+# Dual-Key & Multi-Model Smart Router (Bypasses 503 & 404 permanently)
+def generate_press_note_failover(keys_list: list, parts: list, occasion: str, location: str):
     prompt_context = (
         f"\nప్రకటన విభాగం / స్వభావం: {occasion}\n"
         f"స్థలం: {location}\n"
@@ -161,58 +158,60 @@ def generate_press_note_resilient(client: genai.Client, parts: list, occasion: s
         "ఎమ్మెల్సీ తాతా మధుసూదన్ గారి అధికారిక పత్రికా ప్రకటనను రూపొందించండి.\n"
     )
     full_parts = parts + [prompt_context]
-    
-    # Priority order of available models on modern Gemini API
-    candidate_models = [
-        "gemini-3.8-flash",
-        "gemini-3.8-pro",
-        "gemini-3-flash",
-        "gemini-2.0-flash",
-        "gemini-2.0-pro-exp-02-05"
-    ]
-    
-    # Check valid active models for this API key to avoid 404
-    try:
-        remote_models = [m.name.replace("models/", "") for m in client.models.list()]
-        active_pool = [m for m in candidate_models if m in remote_models]
-        if not active_pool:
-            # Fallback to any model supporting generation
-            active_pool = [m for m in remote_models if "flash" in m or "pro" in m]
-    except Exception:
-        active_pool = candidate_models
 
-    last_error = None
-    for model_name in active_pool:
-        # Try up to 2 attempts per model in case of temporary 503 spike
-        for attempt in range(2):
+    last_err = None
+    
+    for current_key in keys_list:
+        if not current_key or not current_key.strip():
+            continue
+        try:
+            client = genai.Client(api_key=current_key.strip())
+            
+            # Fetch active remote models supported on this key
             try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=full_parts,
-                    config=types.GenerateContentConfig(
-                        system_instruction=SYSTEM_INSTRUCTION,
-                        temperature=0.3,
-                    ),
-                )
-                if response and response.text:
-                    return response.text
-            except Exception as e:
-                last_error = e
-                # Wait 1.5 seconds if 503 occurs before trying again
-                time.sleep(1.5)
-                continue
+                available = [m.name.replace("models/", "") for m in client.models.list()]
+            except Exception:
+                available = []
+                
+            # Candidate models in order of speed and stability
+            priority = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-3.8-flash", "gemini-2.5-pro"]
+            models_to_test = [m for m in priority if m in available] if available else priority
+            
+            for model_name in models_to_test:
+                for attempt in range(2):
+                    try:
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=full_parts,
+                            config=types.GenerateContentConfig(
+                                system_instruction=SYSTEM_INSTRUCTION,
+                                temperature=0.3,
+                            ),
+                        )
+                        if response and response.text:
+                            return response.text
+                    except Exception as err:
+                        last_err = err
+                        time.sleep(1.0)
+                        continue
+        except Exception as key_err:
+            last_err = key_err
+            continue
 
-    raise last_error
+    raise last_err
 
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/240px-BRS_Car_Symbol.png", width=80)
     st.title("సెట్టింగ్స్ (Settings)")
     
+    # Retrieve Secret keys or user inputs
     default_key = ""
+    backup_key = ""
     try:
-        if hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
-            default_key = st.secrets["GEMINI_API_KEY"]
+        if hasattr(st, "secrets"):
+            default_key = st.secrets.get("GEMINI_API_KEY", "")
+            backup_key = st.secrets.get("BACKUP_API_KEY", "")
     except Exception:
         pass
 
@@ -220,7 +219,7 @@ with st.sidebar:
         "Gemini API Key",
         value=default_key,
         type="password",
-        help="Google AI Studio నుండి API Key ఇక్కడ నమోదు చేయండి."
+        help="Google AI Studio API Key ఇక్కడ నమోదు చేయండి."
     )
     
     location = st.text_input(
@@ -243,18 +242,17 @@ with st.sidebar:
     ]
     selected_scope = st.selectbox("ప్రకటన విభాగం / స్వభావం (Topic Scope)", topic_scopes)
 
+# Active key list: prioritizes entered key, then backup key from secrets
+active_keys = [api_key_input]
+if backup_key and backup_key != api_key_input:
+    active_keys.append(backup_key)
+
 # ----------------- MAIN UI -----------------
 st.title("🎙️ ఎమ్మెల్సీ తాతా మధుసూదన్ - పత్రికా ప్రకటన జనరేటర్")
 st.caption("వాయిస్ రికార్డింగ్, ఆడియో/వీడియో లేదా టెక్స్ట్ నోట్స్ ద్వారా మీడియా-రెడీ తెలుగు ప్రెస్ నోట్ రూపొందించండి.")
 
 if not api_key_input:
-    st.warning("ముందుగా సైడ్‌బార్‌లో మీ Gemini API Keyని నమోదు చేయండి.")
-    st.stop()
-
-try:
-    client = get_client(api_key_input)
-except Exception as e:
-    st.error(f"API Client ఎర్రర్: {str(e)}")
+    st.warning("ముందుగా సైడ్‌‌బార్‌లో మీ Gemini API Keyని నమోదు చేయండి.")
     st.stop()
 
 if "final_notes_area" not in st.session_state:
@@ -275,7 +273,7 @@ with tab1:
         )
 
 with tab2:
-    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్ అప్‌లోడ్ చేయండి:")
+    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్ అప్‌‌లోడ్ చేయండి:")
     uploaded_file = st.file_uploader(
         "సపోర్ట్ ఫార్మాట్లు: MP3, WAV, M4A, MP4", 
         type=["mp3", "wav", "m4a", "mp4"]
@@ -289,7 +287,8 @@ with tab2:
                 tmp.write(file_bytes)
                 tmp_path = tmp.name
             with st.spinner("ఫైల్ అప్‌లోడ్ అవుతోంది..."):
-                uploaded_ref = client.files.upload(file=tmp_path)
+                c = genai.Client(api_key=active_keys[0])
+                uploaded_ref = c.files.upload(file=tmp_path)
                 input_parts.append(uploaded_ref)
                 os.remove(tmp_path)
         else:
@@ -331,14 +330,14 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
     if not input_parts:
         st.error("⚠️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
     else:
-        with st.spinner("ఎమ్మెల్సీ గారి అధికారిక ప్రకటన సిద్ధమవుతోంది (Connecting to server)..."):
+        with st.spinner("సర్వర్ కనెక్ట్ అవుతోంది... ఎమ్మెల్సీ గారి అధికారిక ప్రకటన సిద్ధమవుతోంది..."):
             try:
-                press_note_telugu = generate_press_note_resilient(client, input_parts, selected_scope, location)
+                press_note_telugu = generate_press_note_failover(active_keys, input_parts, selected_scope, location)
                 st.session_state["draft_note"] = press_note_telugu
                 st.session_state["final_note"] = press_note_telugu
                 st.session_state["is_finalized"] = False
             except Exception as e:
-                st.error(f"సర్వర్ బిజీగా ఉంది, దయచేసి మరోసారి ప్రయత్నించండి: {str(e)}")
+                st.error(f"ఎర్రర్ సంభవించింది: {str(e)}")
 
 # Display & Edit Section
 if "draft_note" in st.session_state:
