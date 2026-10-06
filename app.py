@@ -593,31 +593,37 @@ with tab1:
 
 with tab2:
     st.markdown("##### ఆడియో లేదా వీడియో ఫైల్స్ అప్‌లోడ్ చేయండి (Multiple Files up to 200MB):")
-    # Extended list supporting mobile M4A, uppercase extensions, and standard mobile audio formats
+    
+    # Optional checkbox to remove type filtering if mobile browser grays out files
+    allow_any_audio = st.checkbox("📱 మొబైల్ ఫైల్స్ కనిపించకపోతే ఇక్కడ క్లిక్ చేయండి (Allow All Mobile Audio Files)", value=False)
+    
+    target_types = None if allow_any_audio else [
+        "m4a", "M4A",
+        "mp3", "MP3",
+        "wav", "WAV",
+        "aac", "AAC",
+        "mp4", "MP4",
+        "ogg", "OGG",
+        "opus", "OPUS",
+        "caf", "CAF",
+        "mov", "MOV",
+        "m4v", "M4V"
+    ]
+    
     uploaded_files = st.file_uploader(
-        "సపోర్ట్ ఫార్మాట్లు: M4A, MP3, WAV, AAC, MP4, MOV (మొబైల్ వాయిస్ రికార్డింగ్‌లు సపోర్ట్ చేయబడతాయి)", 
-        type=[
-            "m4a", "M4A",
-            "mp3", "MP3",
-            "wav", "WAV",
-            "aac", "AAC",
-            "mp4", "MP4",
-            "ogg", "OGG",
-            "opus", "OPUS",
-            "caf", "CAF",
-            "mov", "MOV",
-            "m4v", "M4V"
-        ],
+        "సపోర్ట్ ఫార్మాట్లు: M4A, MP3, WAV, AAC, MP4, MOV (మొబైల్ వాయిస్ రికార్డింగ్‌లు)", 
+        type=target_types,
         accept_multiple_files=True
     )
+    
     if uploaded_files:
         for uploaded_file in uploaded_files:
             file_bytes = uploaded_file.read()
             fname_lower = uploaded_file.name.lower()
             
-            # Robust MIME Type Normalization for Google Gemini API
-            if fname_lower.endswith(".m4a") or uploaded_file.type in ["audio/x-m4a", "audio/m4a"] or not uploaded_file.type:
-                clean_mime = "audio/mp4"  # Official Gemini-compatible standard for M4A
+            # Accurate MIME Type Normalization for Google Gemini API
+            if fname_lower.endswith(".m4a") or "m4a" in (uploaded_file.type or "").lower():
+                clean_mime = "audio/mp4"
             elif fname_lower.endswith(".mp3"):
                 clean_mime = "audio/mp3"
             elif fname_lower.endswith(".wav"):
@@ -647,7 +653,7 @@ with tab2:
                 input_parts.append(
                     types.Part.from_bytes(data=file_bytes, mime_type=clean_mime)
                 )
-        st.success(f"✅ {len(uploaded_files)} ఆడియో/వీడియో ఫైల్(లు) విజయవంతంగా అటాచ్ అయ్యాయి!")
+        st.success(f"✅ {len(uploaded_files)} ఆడియో/వీడియో ఫైల్(లు) సిద్ధంగా ఉన్నాయి!")
 
 with tab3:
     st.markdown("##### ఇంగ్లీష్ ➔ తెలుగు మార్పిడి (English Typing to Telugu):")
