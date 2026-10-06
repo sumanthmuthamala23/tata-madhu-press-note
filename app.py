@@ -1,4 +1,5 @@
 import os
+import time
 import json
 import base64
 import tempfile
@@ -151,25 +152,57 @@ def google_transliterate_telugu(text: str) -> str:
 def get_client(api_key: str):
     return genai.Client(api_key=api_key)
 
-def generate_press_note(client: genai.Client, parts: list, occasion: str, location: str):
+# Dynamic resilient generation with automatic model discovery and multi-attempt failover
+def generate_press_note_resilient(client: genai.Client, parts: list, occasion: str, location: str):
     prompt_context = (
         f"\nప్రకటన విభాగం / స్వభావం: {occasion}\n"
         f"స్థలం: {location}\n"
         "దయచేసి పైన పేర్కొన్న వివరాలు మరియు అందించిన సమాచారం ఆధారంగా "
         "ఎమ్మెల్సీ తాతా మధుసూదన్ గారి అధికారిక పత్రికా ప్రకటనను రూపొందించండి.\n"
     )
-    parts.append(prompt_context)
+    full_parts = parts + [prompt_context]
     
-    # Updated to gemini-3.8-flash as required by Google AI Studio
-    response = client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=parts,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_INSTRUCTION,
-            temperature=0.3,
-        ),
-    )
-    return response.text
+    # Priority order of available models on modern Gemini API
+    candidate_models = [
+        "gemini-3.8-flash",
+        "gemini-3.8-pro",
+        "gemini-3-flash",
+        "gemini-2.0-flash",
+        "gemini-2.0-pro-exp-02-05"
+    ]
+    
+    # Check valid active models for this API key to avoid 404
+    try:
+        remote_models = [m.name.replace("models/", "") for m in client.models.list()]
+        active_pool = [m for m in candidate_models if m in remote_models]
+        if not active_pool:
+            # Fallback to any model supporting generation
+            active_pool = [m for m in remote_models if "flash" in m or "pro" in m]
+    except Exception:
+        active_pool = candidate_models
+
+    last_error = None
+    for model_name in active_pool:
+        # Try up to 2 attempts per model in case of temporary 503 spike
+        for attempt in range(2):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=full_parts,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                        temperature=0.3,
+                    ),
+                )
+                if response and response.text:
+                    return response.text
+            except Exception as e:
+                last_error = e
+                # Wait 1.5 seconds if 503 occurs before trying again
+                time.sleep(1.5)
+                continue
+
+    raise last_error
 
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
@@ -298,14 +331,14 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
     if not input_parts:
         st.error("⚠️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
     else:
-        with st.spinner("ఎమ్మెల్సీ గారి అధికారిక ప్రకటన సిద్ధమవుతోంది..."):
+        with st.spinner("ఎమ్మెల్సీ గారి అధికారిక ప్రకటన సిద్ధమవుతోంది (Connecting to server)..."):
             try:
-                press_note_telugu = generate_press_note(client, input_parts, selected_scope, location)
+                press_note_telugu = generate_press_note_resilient(client, input_parts, selected_scope, location)
                 st.session_state["draft_note"] = press_note_telugu
                 st.session_state["final_note"] = press_note_telugu
                 st.session_state["is_finalized"] = False
             except Exception as e:
-                st.error(f"ఎర్రర్ సంభవించింది: {str(e)}")
+                st.error(f"సర్వర్ బిజీగా ఉంది, దయచేసి మరోసారి ప్రయత్నించండి: {str(e)}")
 
 # Display & Edit Section
 if "draft_note" in st.session_state:
