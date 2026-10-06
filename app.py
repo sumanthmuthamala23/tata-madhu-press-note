@@ -16,12 +16,12 @@ from google.genai import types
 
 # Page setup
 st.set_page_config(
-    page_title="MLC తాతా మధు - అధికారిక పత్రికా ప్రకటన జనరేటర్",
+    page_title="MLC తాతా మధు - అధికారిక పత్రికా ప్రకటన కన్సోల్",
     page_icon="📰",
     layout="wide",
 )
 
-# Background & Letterhead Base64 Helper
+# Helper to read and encode local files to base64
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         with open(image_path, "rb") as img_file:
@@ -29,6 +29,15 @@ def get_base64_image(image_path):
     return None
 
 bg_image_base64 = get_base64_image("background.png")
+dev_image_base64 = get_base64_image("Sumanth.jpg") or get_base64_image("sumanth.jpg")
+
+# Search letterhead file
+lh_filename = None
+for fname in ["letterhead.png", "letter head(2).jpg", "letterhead.jpg"]:
+    if os.path.exists(fname):
+        lh_filename = fname
+        break
+lh_image_base64 = get_base64_image(lh_filename) if lh_filename else None
 
 if bg_image_base64:
     bg_style = f"""
@@ -72,63 +81,67 @@ st.markdown(f"""
         border-radius: 8px !important;
     }}
 
+    /* Official Letterhead Container matching A4 */
     .letterhead-container {{
         background-color: #ffffff;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-        padding: 40px 48px;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 30px 48px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.08);
         color: #111111;
-        line-height: 1.9;
+        line-height: 1.95;
         font-size: 18px;
-        max-width: 900px;
+        max-width: 860px;
         margin: 0 auto;
     }}
-    
-    .lh-header-table {{
+
+    .letterhead-banner-wrapper {{
         width: 100%;
+        overflow: hidden;
+        max-height: 175px;
+        margin-bottom: 20px;
         border-bottom: 2px solid #b82329;
-        padding-bottom: 18px;
-        margin-bottom: 25px;
+        padding-bottom: 10px;
     }}
-    
-    .lh-left {{
-        vertical-align: top;
-        text-align: left;
-        width: 35%;
+
+    .letterhead-banner-img {{
+        width: 100%;
+        object-fit: cover;
+        object-position: top center;
     }}
-    .lh-center {{
-        vertical-align: middle;
-        text-align: center;
-        width: 30%;
+
+    /* Developer Attribution Badge */
+    .dev-badge {{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: #ffffff;
+        border: 1.5px solid #fecdd3;
+        border-radius: 12px;
+        padding: 10px 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-top: 20px;
     }}
-    .lh-right {{
-        vertical-align: top;
-        text-align: right;
-        width: 35%;
+    .dev-img {{
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #b82329;
+        flex-shrink: 0;
+    }}
+    .dev-text {{
         font-size: 13px;
-        line-height: 1.45;
-        color: #1f2937;
-    }}
-    
-    .lh-leader-name {{
-        color: #b82329;
-        font-size: 24px;
-        font-weight: 800;
-        letter-spacing: 0.5px;
-        margin: 0;
-        text-transform: uppercase;
-    }}
-    .lh-leader-sub {{
-        font-size: 16px;
         font-weight: 700;
-        color: #111827;
-        margin: 2px 0 0 0;
+        color: #1f2937;
+        line-height: 1.25;
     }}
-    .lh-leader-loc {{
-        font-size: 14px;
-        color: #4b5563;
-        margin: 0;
+    .dev-sub {{
+        font-size: 11px;
+        color: #b82329;
+        font-weight: 600;
+        margin-top: 3px;
+        line-height: 1.3;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -266,8 +279,38 @@ def create_docx_press_note(text: str, date_str: str, location_str: str) -> io.By
     bio.seek(0)
     return bio
 
-# Printable HTML Template with Official Letterhead
-def get_printable_letterhead_html(content: str, date_str: str, location_str: str) -> str:
+# Printable HTML Template with Top Banner Crop
+def get_printable_letterhead_html(content: str, date_str: str, location_str: str, lh_base64: str) -> str:
+    if lh_base64:
+        header_html = f"""
+        <div style="width: 100%; max-height: 180px; overflow: hidden; border-bottom: 2px solid #b82329; margin-bottom: 20px;">
+            <img src="data:image/png;base64,{lh_base64}" style="width: 100%; object-fit: cover; object-position: top center;" />
+        </div>
+        """
+    else:
+        header_html = """
+        <div style="border-bottom: 2px solid #b82329; padding-bottom: 12px; margin-bottom: 20px;">
+            <table style="width: 100%;">
+                <tr>
+                    <td style="width: 40%; vertical-align: top;">
+                        <h2 style="color: #b82329; margin: 0; font-size: 22px; font-weight: 800;">TATA MADHUSUDHAN</h2>
+                        <div style="font-size: 15px; font-weight: bold;">M.L.C</div>
+                        <div style="font-size: 13px; color: #555;">Khammam, Telangana</div>
+                    </td>
+                    <td style="width: 20%; text-align: center; vertical-align: middle;">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/180px-BRS_Car_Symbol.png" width="60" alt="Emblem">
+                    </td>
+                    <td style="width: 40%; text-align: right; vertical-align: top; font-size: 11px; color: #444; line-height: 1.4;">
+                        Quarter No. 1104, 11th Floor,<br>
+                        M.S. Block-III, Old MLA Quarters,<br>
+                        Hyderguda, Hyderabad - 500029<br>
+                        e-mail: tatamadhu@gmail.com
+                    </td>
+                </tr>
+            </table>
+        </div>
+        """
+
     return f"""
     <!DOCTYPE html>
     <html>
@@ -286,41 +329,18 @@ def get_printable_letterhead_html(content: str, date_str: str, location_str: str
             .container {{
                 max-width: 800px;
                 margin: 0 auto;
-                border: 1px solid #ccc;
-                padding: 40px;
-            }}
-            .header-table {{
-                width: 100%;
-                border-bottom: 2px solid #b82329;
-                padding-bottom: 12px;
-                margin-bottom: 20px;
-            }}
-            .leader-title {{
-                color: #b82329;
-                font-size: 22px;
-                font-weight: 800;
-                margin: 0;
-            }}
-            .leader-sub {{
-                font-size: 15px;
-                font-weight: 700;
-                margin: 2px 0;
-            }}
-            .hq-address {{
-                font-size: 11px;
-                color: #444;
-                line-height: 1.4;
-                text-align: right;
+                padding: 10px 20px;
             }}
             .meta {{
                 text-align: right;
                 font-weight: 600;
-                font-size: 14px;
-                margin-bottom: 15px;
+                font-size: 15px;
+                margin-bottom: 18px;
+                color: #374151;
             }}
             .content {{
-                font-size: 16px;
-                line-height: 1.85;
+                font-size: 17px;
+                line-height: 1.95;
             }}
             @media print {{
                 body {{ padding: 0; }}
@@ -330,35 +350,18 @@ def get_printable_letterhead_html(content: str, date_str: str, location_str: str
         </style>
     </head>
     <body>
-        <div class="no-print" style="text-align: center; margin-bottom: 20px;">
-            <button onclick="window.print()" style="padding: 10px 24px; font-size: 16px; background-color: #b82329; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                🖨️ Print / Save as PDF or JPEG
+        <div class="no-print" style="text-align: center; margin-bottom: 25px;">
+            <button onclick="window.print()" style="padding: 12px 28px; font-size: 16px; font-weight: bold; background-color: #b82329; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                🖨️ నేరుగా ప్రింట్ / PDF తీయండి (Print or Save as PDF)
             </button>
         </div>
         <div class="container">
-            <table class="header-table">
-                <tr>
-                    <td style="width: 38%; vertical-align: top;">
-                        <h2 class="leader-title">TATA MADHUSUDHAN</h2>
-                        <div class="leader-sub">M.L.C</div>
-                        <div style="font-size: 13px; color: #555;">Khammam, Telangana</div>
-                    </td>
-                    <td style="width: 24%; text-align: center; vertical-align: middle;">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/180px-BRS_Car_Symbol.png" width="60" alt="Emblem">
-                    </td>
-                    <td style="width: 38%; vertical-align: top;" class="hq-address">
-                        Quarter No. 1104, 11th Floor,<br>
-                        M.S. Block-III, Old MLA Quarters,<br>
-                        Hyderguda, Hyderabad - 500029<br>
-                        e-mail: tatamadhu@gmail.com
-                    </td>
-                </tr>
-            </table>
+            {header_html}
             <div class="meta">స్థలం: {location_str} | తేదీ: {date_str}</div>
             <div class="content">
                 {content.replace(chr(10), '<br>')}
             </div>
-            <div style="border-top: 1px dashed #b82329; margin-top: 30px; padding-top: 10px; text-align: right; font-weight: bold; color: #444;">
+            <div style="border-top: 1px dashed #b82329; margin-top: 35px; padding-top: 12px; text-align: right; font-weight: bold; color: #444;">
                 విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం
             </div>
         </div>
@@ -391,7 +394,6 @@ with st.sidebar:
     selected_date = st.date_input("తేదీని ఎంచుకోండి", value=datetime.date.today())
     formatted_date = selected_date.strftime("%d-%m-%Y")
     
-    # Robust Location Selection & Transliteration
     st.markdown("##### 📍 స్థలం / వేదిక (Location):")
     if "final_loc_key" not in st.session_state:
         st.session_state["final_loc_key"] = "ఖమ్మం"
@@ -408,7 +410,6 @@ with st.sidebar:
         key="final_loc_key"
     )
 
-    # 10 Topic Scopes
     topic_scopes = [
         "ప్రజా సమస్యలు & వినతులు (Public Grievances & Demands)",
         "ప్రభుత్వ విధానాలు / విమర్శలు (State Govt Policies / Criticisms)",
@@ -422,6 +423,19 @@ with st.sidebar:
         "శుభాకాంక్షలు & సంతాపాలు (Greetings & Condolences)",
     ]
     selected_scope = st.selectbox("ప్రకటన విభాగం / స్వభావం (Topic Scope)", topic_scopes)
+
+    # Developer Attribution Badge in Sidebar
+    st.markdown("---")
+    dev_img_html = f'<img src="data:image/jpeg;base64,{dev_image_base64}" class="dev-img">' if dev_image_base64 else '<span style="font-size:24px;">👨‍💻</span>'
+    st.markdown(f"""
+    <div class="dev-badge">
+        {dev_img_html}
+        <div>
+            <div class="dev-text">Designed & Developed by<br>Sumanth Muthamala</div>
+            <div class="dev-sub">Revenue Inspector & PA to MLC Khammam</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 active_keys = [api_key_input]
 if backup_key and backup_key != api_key_input:
@@ -508,7 +522,7 @@ st.divider()
 
 if st.button("🚀 పత్రికా ప్రకటనను రూపొందించండి (Generate Press Note)", type="primary", use_container_width=True):
     if not input_parts:
-        st.error("⚠️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
+        st.error("⚠️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
     else:
         with st.spinner("అధికారిక ప్రెస్ నోట్ సిద్ధమవుతోంది..."):
             try:
@@ -538,12 +552,11 @@ if "draft_note" in st.session_state:
         key="editor_area"
     )
     
-    # Directly Connected Gemini Suggestion / Agony / Tone Refinement Box
-    st.markdown("##### 🤖 జెమినీ AI సలహా / ఆగ్రహం / మోడ్ మార్పు (AI Tone & Situation Re-generator):")
-    with st.expander("💡 ప్రెస్ నోట్ టోన్ మార్చాలా? (ఉదా: ప్రభుత్వంపై తీవ్ర ఆగ్రహం, రైతుల ఆవేదన పెంచడం, వివరాలు జోడించడం)", expanded=True):
+    st.markdown("##### 🤖 జెమినీ AI సలహా / మోడ్ మార్పు (AI Tone & Situation Re-generator):")
+    with st.expander("💡 ప్రెస్ నోట్ మార్పులు (రైతుల ఆవేదన పెంచడం, వివరాలు చేర్చడం, స్పష్టత ఇవ్వడం)", expanded=True):
         ai_remark = st.text_input(
             "మీ సూచన లేదా అభ్యర్థనను ఇక్కడ రాయండి (English or Telugu):",
-            placeholder="e.g., 'Make the tone very aggressive against the government', 'రైతుల ఆవేదనను మరింత భావోద్వేగంగా మార్చండి'..."
+            placeholder="e.g., 'రైతుల ఆవేదనను మరింత భావోద్వేగంగా మార్చండి', 'Add demand for immediate relief'..."
         )
         if st.button("⚡ సూచన ఆధారంగా ప్రెస్ నోట్ తిరిగి రూపొందించండి (Re-generate with AI)"):
             if ai_remark.strip():
@@ -553,11 +566,11 @@ if "draft_note" in st.session_state:
                         CURRENT PRESS NOTE DRAFT:
                         {edited_note}
                         
-                        USER INSTRUCTION / REMARK / AGONY / SITUATION UPDATE:
+                        USER INSTRUCTION / REMARK / SITUATION UPDATE:
                         {ai_remark}
                         
                         TASK:
-                        Rewrite and enhance the press release strictly following the user's instructions (e.g. increase agony, make it more aggressive, add specific points) while maintaining the official persona of MLC Tata Madhusudhan Garu and standard Telugu journalistic standards.
+                        Rewrite and refine the press release strictly following the user's instructions while maintaining the official persona of MLC Tata Madhusudhan Garu and standard Telugu journalistic standards.
                         """
                         updated_note = generate_ai_response(active_keys, [refine_prompt])
                         st.session_state["draft_note"] = updated_note
@@ -582,26 +595,39 @@ if st.session_state.get("is_finalized", False):
     st.divider()
     st.subheader("📄 అధికారిక లెటర్‌హెడ్ వీక్షణ (Official Letterhead View)")
     
+    if lh_image_base64:
+        banner_view = f"""
+        <div class="letterhead-banner-wrapper">
+            <img src="data:image/png;base64,{lh_image_base64}" class="letterhead-banner-img" alt="Official Letterhead">
+        </div>
+        """
+    else:
+        banner_view = """
+        <div style="border-bottom: 2px solid #b82329; padding-bottom: 12px; margin-bottom: 20px;">
+            <table style="width: 100%;">
+                <tr>
+                    <td style="width: 40%; vertical-align: top;">
+                        <h2 style="color: #b82329; margin: 0; font-size: 22px; font-weight: 800;">TATA MADHUSUDHAN</h2>
+                        <div style="font-size: 15px; font-weight: bold;">M.L.C</div>
+                        <div style="font-size: 13px; color: #555;">Khammam, Telangana</div>
+                    </td>
+                    <td style="width: 20%; text-align: center; vertical-align: middle;">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/180px-BRS_Car_Symbol.png" width="60" alt="Emblem">
+                    </td>
+                    <td style="width: 40%; text-align: right; vertical-align: top; font-size: 11px; color: #444; line-height: 1.4;">
+                        Quarter No. 1104, 11th Floor,<br>
+                        M.S. Block-III, Old MLA Quarters,<br>
+                        Hyderguda, Hyderabad - 500029<br>
+                        e-mail: tatamadhu@gmail.com
+                    </td>
+                </tr>
+            </table>
+        </div>
+        """
+
     st.markdown(f"""
     <div class="letterhead-container">
-        <table class="lh-header-table">
-            <tr>
-                <td class="lh-left">
-                    <h2 class="lh-leader-name">TATA MADHUSUDHAN</h2>
-                    <div class="lh-leader-sub">M.L.C</div>
-                    <div class="lh-leader-loc">Khammam, Telangana</div>
-                </td>
-                <td class="lh-center">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/180px-BRS_Car_Symbol.png" width="65" alt="Telangana Council Emblem">
-                </td>
-                <td class="lh-right">
-                    Quarter No. 1104, 11th Floor,<br>
-                    M.S. Block-III, Old MLA Quarters,<br>
-                    Hyderguda, Hyderabad - 500029<br>
-                    <strong>e-mail:</strong> tatamadhu@gmail.com
-                </td>
-            </tr>
-        </table>
+        {banner_view}
         <div style="text-align: right; font-weight: 600; font-size: 15px; margin-bottom: 20px; color: #374151;">
             స్థలం: {final_location} &nbsp;|&nbsp; తేదీ: {formatted_date}
         </div>
@@ -616,12 +642,13 @@ if st.session_state.get("is_finalized", False):
     
     st.write("")
     
+    # Direct Downloads
     col_d1, col_d2, col_d3 = st.columns(3)
     
     with col_d1:
         docx_data = create_docx_press_note(final_content, formatted_date, final_location)
         st.download_button(
-            label="📄 Word File గా డౌన్‌లోడ్ చేయండి (.DOCX)",
+            label="📄 Word File (.DOCX)",
             data=docx_data,
             file_name=f"Tata_Madhu_PressNote_{formatted_date}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -629,19 +656,19 @@ if st.session_state.get("is_finalized", False):
         )
         
     with col_d2:
-        html_page = get_printable_letterhead_html(final_content, formatted_date, final_location)
+        html_page = get_printable_letterhead_html(final_content, formatted_date, final_location, lh_image_base64)
         st.download_button(
-            label="🖨️ PDF / JPEG ప్రింట్ ఫైల్ (.HTML)",
+            label="🖨️ PDF / Print File (.HTML)",
             data=html_page,
             file_name=f"Tata_Madhu_Letterhead_{formatted_date}.html",
             mime="text/html",
             use_container_width=True,
-            help="డౌన్‌లోడ్ చేసి బ్రౌజర్‌లో ఓపెన్ చేసి 'Print' ➔ 'Save as PDF' లేదా JPEG గా సేవ్ చేసుకోవచ్చు."
+            help="ఓపెన్ చేసి Print -> Save as PDF ఎంచుకోండి."
         )
         
     with col_d3:
         st.download_button(
-            label="📥 టెక్స్ట్ ఫైల్‌గా డౌన్‌లోడ్ చేయండి (.TXT)",
+            label="📥 Text File (.TXT)",
             data=final_content,
             file_name=f"Tata_Madhu_PressNote_{formatted_date}.txt",
             mime="text/plain",
@@ -686,3 +713,17 @@ if st.session_state.get("is_finalized", False):
 
     with st5:
         st.text_area("YouTube Title & Description:", value=youtube_text, height=200)
+
+# Footer Developer Attribution
+st.markdown("---")
+dev_footer_img = f'<img src="data:image/jpeg;base64,{dev_image_base64}" style="width: 36px; height: 36px; border-radius: 50%; vertical-align: middle; margin-right: 10px; border: 1.5px solid #b82329;">' if dev_image_base64 else '👨‍💻 '
+st.markdown(
+    f"""
+    <div style="text-align: center; color: #374151; font-size: 14px; padding: 18px 0;">
+        {dev_footer_img}
+        <strong>Designed & Developed by Sumanth Muthamala</strong> &nbsp;|&nbsp; 
+        <span style="color: #b82329; font-weight: 600;">Revenue Inspector & PA to MLC Khammam</span>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
