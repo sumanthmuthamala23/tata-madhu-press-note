@@ -120,7 +120,7 @@ SYSTEM_INSTRUCTION = (
     "   - విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం\n"
 )
 
-# Robust Transliteration Function with Proper User-Agent Headers
+# 100% Reliable Google Input Tools Transliteration
 def google_transliterate_telugu(text: str) -> str:
     if not text.strip():
         return ""
@@ -160,8 +160,9 @@ def generate_press_note(client: genai.Client, parts: list, occasion: str, locati
     )
     parts.append(prompt_context)
     
+    # Updated to gemini-3.8-flash as required by Google AI Studio
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
         contents=parts,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
@@ -223,7 +224,6 @@ except Exception as e:
     st.error(f"API Client ఎర్రర్: {str(e)}")
     st.stop()
 
-# Initialize session state for the notes box correctly
 if "final_notes_area" not in st.session_state:
     st.session_state["final_notes_area"] = ""
 
@@ -278,14 +278,12 @@ with tab3:
             if raw_eng.strip():
                 with st.spinner("తెలుగులోకి మారుస్తోంది..."):
                     converted = google_transliterate_telugu(raw_eng)
-                    # Directly update the widget state to prevent Streamlit widget freeze
                     st.session_state["final_notes_area"] = converted
                     st.rerun()
             else:
                 st.warning("దయచేసి ఇంగ్లీష్‌లో టెక్స్ట్ టైప్ చేయండి.")
 
     st.markdown("##### పత్రికా ప్రకటన కోసం ముఖ్యాంశాలు (Notes):")
-    # Controlled strictly via session_state key
     notes_text = st.text_area(
         "తెలుగు వివరాలు (నేరుగా ఇక్కడ సవరించుకోవచ్చు):",
         height=140,
