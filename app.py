@@ -76,7 +76,7 @@ else:
     }
     """
 
-# Custom CSS with Anek Telugu Font & Material Symbol Fixes
+# Custom CSS with Anek Telugu Font & Mobile WebSocket Keepalive
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@300;400;500;600;700;800&display=swap');
@@ -578,8 +578,8 @@ if "final_notes_area" not in st.session_state:
     st.session_state["final_notes_area"] = ""
 
 # Persistent container for files across mobile browser redraws
-if "mobile_file_parts" not in st.session_state:
-    st.session_state["mobile_file_parts"] = []
+if "saved_audio_bytes" not in st.session_state:
+    st.session_state["saved_audio_bytes"] = []
 
 tab1, tab2, tab3 = st.tabs(["🎤 లైవ్ రికార్డింగ్ (Mic)", "📁 ఆడియో / వీడియో అప్‌లోడ్", "✍️ సిట్యుయేషన్ నోట్స్ (Text)"])
 
@@ -596,58 +596,74 @@ with tab1:
         )
 
 with tab2:
-    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్స్ అప్‌లోడ్ చేయండి (Mobile & Laptop Supported):")
-    
-    # Universal file uploader without type restrictions that block mobile file selection
-    uploaded_files = st.file_uploader(
-        "రికార్డింగ్ ఫైల్ ఎంచుకోండి (Select M4A, MP3, WAV, or Video from Device)", 
-        type=None,
-        accept_multiple_files=True,
-        key="global_media_uploader"
-    )
-    
-    if uploaded_files:
-        st.session_state["mobile_file_parts"] = []
-        for uploaded_file in uploaded_files:
-            file_bytes = uploaded_file.read()
-            fname_lower = uploaded_file.name.lower()
-            
-            # Universal MIME assignment
-            if fname_lower.endswith((".m4a", ".aac")) or "m4a" in (uploaded_file.type or "").lower():
-                clean_mime = "audio/mp4"
-            elif fname_lower.endswith(".mp3"):
-                clean_mime = "audio/mp3"
-            elif fname_lower.endswith(".wav"):
-                clean_mime = "audio/wav"
-            elif fname_lower.endswith((".ogg", ".opus")):
-                clean_mime = "audio/ogg"
-            elif fname_lower.endswith((".mp4", ".m4v")):
-                clean_mime = "video/mp4"
-            elif fname_lower.endswith(".mov"):
-                clean_mime = "video/quicktime"
-            else:
-                clean_mime = "audio/mp4"
+    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్ అప్‌లోడ్ చేయండి:")
 
-            if len(file_bytes) > 20 * 1024 * 1024:
-                file_ext = os.path.splitext(uploaded_file.name)[1] or ".m4a"
+    col_m1, col_m2 = st.columns([1, 1])
+    with col_m1:
+        upload_mode = st.radio(
+            "అప్‌లోడ్ మోడ్ ఎంచుకోండి (Mode):",
+            ["📱 మొబైల్ సింగిల్ రికార్డింగ్ (Single Recording)", "💻 మల్టీ-ఫైల్ బ్యాచ్ (Multiple Files)"],
+            index=0
+        )
+
+    is_multi = "Multiple" in upload_mode
+
+    # Use clean accept criteria that matches mobile audio intents
+    uploaded_files = st.file_uploader(
+        "రికార్డింగ్ ఫైల్ ఎంచుకోండి (.m4a, .mp3, .wav, .mp4):",
+        type=["m4a", "mp3", "wav", "aac", "mp4", "ogg", "opus", "caf", "mov"],
+        accept_multiple_files=is_multi,
+        key=f"uploader_{is_multi}"
+    )
+
+    # Process files
+    raw_file_list = []
+    if uploaded_files:
+        if isinstance(uploaded_files, list):
+            raw_file_list = uploaded_files
+        else:
+            raw_file_list = [uploaded_files]
+
+    if raw_file_list:
+        st.session_state["saved_audio_bytes"] = []
+        for uf in raw_file_list:
+            f_bytes = uf.read()
+            fn_low = uf.name.lower()
+
+            if fn_low.endswith((".m4a", ".aac")) or "m4a" in (uf.type or "").lower():
+                c_mime = "audio/mp4"
+            elif fn_low.endswith(".mp3"):
+                c_mime = "audio/mp3"
+            elif fn_low.endswith(".wav"):
+                c_mime = "audio/wav"
+            elif fn_low.endswith((".ogg", ".opus")):
+                c_mime = "audio/ogg"
+            elif fn_low.endswith((".mp4", ".m4v")):
+                c_mime = "video/mp4"
+            elif fn_low.endswith(".mov"):
+                c_mime = "video/quicktime"
+            else:
+                c_mime = "audio/mp4"
+
+            if len(f_bytes) > 20 * 1024 * 1024:
+                file_ext = os.path.splitext(uf.name)[1] or ".m4a"
                 with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
-                    tmp.write(file_bytes)
+                    tmp.write(f_bytes)
                     tmp_path = tmp.name
-                with st.spinner(f"పెద్ద ఫైల్ అప్‌లోడ్ అవుతోంది ({uploaded_file.name})..."):
+                with st.spinner(f"పెద్ద ఫైల్ అప్‌లోడ్ అవుతోంది ({uf.name})..."):
                     c = genai.Client(api_key=active_keys[0])
-                    uploaded_ref = c.files.upload(file=tmp_path, mime_type=clean_mime)
-                    st.session_state["mobile_file_parts"].append(uploaded_ref)
+                    up_ref = c.files.upload(file=tmp_path, mime_type=c_mime)
+                    st.session_state["saved_audio_bytes"].append(up_ref)
                     os.remove(tmp_path)
             else:
-                st.session_state["mobile_file_parts"].append(
-                    types.Part.from_bytes(data=file_bytes, mime_type=clean_mime)
+                st.session_state["saved_audio_bytes"].append(
+                    types.Part.from_bytes(data=f_bytes, mime_type=c_mime)
                 )
 
-        st.success(f"✅ {len(uploaded_files)} ఆడియో/వీడియో ఫైల్(లు) విజయవంతంగా అటాచ్ అయ్యాయి!")
+        st.success(f"✅ {len(raw_file_list)} ఆడియో/వీడియో ఫైల్(లు) విజయవంతంగా లోడ్ అయ్యాయి!")
 
-    # Include cached parts in input
-    if st.session_state.get("mobile_file_parts"):
-        input_parts.extend(st.session_state["mobile_file_parts"])
+    if st.session_state.get("saved_audio_bytes"):
+        input_parts.extend(st.session_state["saved_audio_bytes"])
 
 with tab3:
     st.markdown("##### ఇంగ్లీష్ ➔ తెలుగు మార్పిడి (English Typing to Telugu):")
@@ -680,7 +696,7 @@ st.divider()
 
 if st.button("🚀 పత్రికా ప్రకటనను రూపొందించండి (Generate Press Note)", type="primary", use_container_width=True):
     if not input_parts:
-        st.error("⚠️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
+        st.error("⚠️️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
     else:
         with st.spinner("అధికారిక ప్రెస్ నోట్ సిద్ధమవుతోంది..."):
             try:
