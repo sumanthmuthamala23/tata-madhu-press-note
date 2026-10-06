@@ -83,12 +83,10 @@ st.markdown(f"""
     
     {bg_style}
     
-    /* Apply Telugu font selectively so Streamlit icons don't break into ligatures */
     html, body, p, div:not([data-testid="stIconMaterial"]), h1, h2, h3, h4, h5, h6, input, textarea, button {{
         font-family: 'Anek Telugu', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }}
 
-    /* Prevent icon fonts from breaking */
     span[data-testid="stIconMaterial"], .material-symbols-rounded, .material-symbols-outlined {{
         font-family: 'Material Symbols Rounded', 'Material Symbols Outlined' !important;
         font-size: 22px !important;
@@ -96,14 +94,12 @@ st.markdown(f"""
         white-space: nowrap !important;
     }}
 
-    /* Left Sidebar Polish */
     section[data-testid="stSidebar"] {{
         background-color: #fff2f6 !important;
         border-right: 1.5px solid #fecdd3;
         box-shadow: 2px 0 14px rgba(225, 29, 72, 0.05);
     }}
 
-    /* Main Console Header Banner */
     .header-card {{
         background: linear-gradient(90deg, #991b1b 0%, #be123c 65%, #e11d48 100%);
         color: #ffffff !important;
@@ -127,7 +123,6 @@ st.markdown(f"""
         font-weight: 500 !important;
     }}
 
-    /* Input Fields */
     .stTextInput>div>div>input, .stTextArea>div>div>textarea {{
         background-color: #ffffff !important;
         color: #0f172a !important;
@@ -141,7 +136,6 @@ st.markdown(f"""
         box-shadow: 0 0 0 2px rgba(190, 18, 60, 0.15) !important;
     }}
 
-    /* Primary Action Buttons */
     div.stButton > button[kind="primary"] {{
         background: linear-gradient(90deg, #991b1b 0%, #be123c 100%) !important;
         color: #ffffff !important;
@@ -158,7 +152,6 @@ st.markdown(f"""
         box-shadow: 0 6px 18px rgba(190, 18, 60, 0.45) !important;
     }}
 
-    /* Official Letterhead Replica Container */
     .letterhead-container {{
         background-color: #ffffff;
         border: 1.5px solid #cbd5e1;
@@ -183,7 +176,6 @@ st.markdown(f"""
         padding-bottom: 8px;
     }}
 
-    /* Developer Attribution Badge */
     .dev-badge {{
         display: flex;
         align-items: center;
@@ -217,7 +209,6 @@ st.markdown(f"""
         line-height: 1.3;
     }}
 
-    /* Top Sidebar Emblem Card */
     .sidebar-emblem-card {{
         display: flex;
         align-items: center;
@@ -602,30 +593,61 @@ with tab1:
 
 with tab2:
     st.markdown("##### ఆడియో లేదా వీడియో ఫైల్స్ అప్‌లోడ్ చేయండి (Multiple Files up to 200MB):")
+    # Extended list supporting mobile M4A, uppercase extensions, and standard mobile audio formats
     uploaded_files = st.file_uploader(
-        "సపోర్ట్ ఫార్మాట్లు: MP3, WAV, M4A, MP4 (ఎన్నైనా ఫైల్స్ ఎంచుకోవచ్చు)", 
-        type=["mp3", "wav", "m4a", "mp4"],
+        "సపోర్ట్ ఫార్మాట్లు: M4A, MP3, WAV, AAC, MP4, MOV (మొబైల్ వాయిస్ రికార్డింగ్‌లు సపోర్ట్ చేయబడతాయి)", 
+        type=[
+            "m4a", "M4A",
+            "mp3", "MP3",
+            "wav", "WAV",
+            "aac", "AAC",
+            "mp4", "MP4",
+            "ogg", "OGG",
+            "opus", "OPUS",
+            "caf", "CAF",
+            "mov", "MOV",
+            "m4v", "M4V"
+        ],
         accept_multiple_files=True
     )
     if uploaded_files:
         for uploaded_file in uploaded_files:
             file_bytes = uploaded_file.read()
-            mime_type = uploaded_file.type or "audio/mp3"
+            fname_lower = uploaded_file.name.lower()
+            
+            # Robust MIME Type Normalization for Google Gemini API
+            if fname_lower.endswith(".m4a") or uploaded_file.type in ["audio/x-m4a", "audio/m4a"] or not uploaded_file.type:
+                clean_mime = "audio/mp4"  # Official Gemini-compatible standard for M4A
+            elif fname_lower.endswith(".mp3"):
+                clean_mime = "audio/mp3"
+            elif fname_lower.endswith(".wav"):
+                clean_mime = "audio/wav"
+            elif fname_lower.endswith(".aac"):
+                clean_mime = "audio/aac"
+            elif fname_lower.endswith(".ogg") or fname_lower.endswith(".opus"):
+                clean_mime = "audio/ogg"
+            elif fname_lower.endswith(".mp4") or fname_lower.endswith(".m4v"):
+                clean_mime = "video/mp4"
+            elif fname_lower.endswith(".mov"):
+                clean_mime = "video/quicktime"
+            else:
+                clean_mime = uploaded_file.type or "audio/mp4"
             
             if len(file_bytes) > 20 * 1024 * 1024:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_file.name) as tmp:
+                file_ext = os.path.splitext(uploaded_file.name)[1] or ".m4a"
+                with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
                     tmp.write(file_bytes)
                     tmp_path = tmp.name
-                with st.spinner(f"పెద్ద ఫైల్ అప్‌‌లోడ్ అవుతోంది ({uploaded_file.name})..."):
+                with st.spinner(f"పెద్ద ఫైల్ అప్‌లోడ్ అవుతోంది ({uploaded_file.name})..."):
                     c = genai.Client(api_key=active_keys[0])
-                    uploaded_ref = c.files.upload(file=tmp_path)
+                    uploaded_ref = c.files.upload(file=tmp_path, mime_type=clean_mime)
                     input_parts.append(uploaded_ref)
                     os.remove(tmp_path)
             else:
                 input_parts.append(
-                    types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
+                    types.Part.from_bytes(data=file_bytes, mime_type=clean_mime)
                 )
-        st.success(f"✅ {len(uploaded_files)} ఫైల్(లు) విజయవంతంగా లోడ్ అయ్యాయి!")
+        st.success(f"✅ {len(uploaded_files)} ఆడియో/వీడియో ఫైల్(లు) విజయవంతంగా అటాచ్ అయ్యాయి!")
 
 with tab3:
     st.markdown("##### ఇంగ్లీష్ ➔ తెలుగు మార్పిడి (English Typing to Telugu):")
@@ -729,7 +751,7 @@ if st.session_state.get("is_finalized", False):
     final_content = st.session_state.get("final_note", "")
     
     st.divider()
-    st.subheader("📄 అధికారిక లెటర్‌హెడ్ వీక్షణ (Official Letterhead View)")
+    st.subheader("📄 అధికారిక లెటర్‌‌హెడ్ వీక్షణ (Official Letterhead View)")
     
     if lh_banner_base64:
         banner_img_html = f'<img src="data:image/png;base64,{lh_banner_base64}" class="letterhead-banner-img" alt="Official Letterhead">'
