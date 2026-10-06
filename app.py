@@ -12,27 +12,42 @@ st.set_page_config(
     layout="wide",
 )
 
-# Custom Styling
+# Custom Styling with Background Theme
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Suranna&family=Ramabhadra&display=swap');
     
+    /* Full App Page Background with Soft Telangana Pink Tint */
+    .stApp {
+        background: linear-gradient(135deg, #fff5f8 0%, #ffedf2 40%, #ffffff 100%);
+        background-attachment: fixed;
+    }
+    
+    /* Left Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: #fff0f4;
+        border-right: 1px solid #ffd1dc;
+    }
+
+    /* Official Letterhead Output Box */
     .press-box {
         background-color: #ffffff;
         border: 2px solid #b82329;
-        border-radius: 8px;
-        padding: 28px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        border-radius: 10px;
+        padding: 30px;
+        box-shadow: 0 8px 24px rgba(184, 35, 41, 0.08);
         color: #111111;
         line-height: 1.85;
         font-family: 'Suranna', serif;
     }
+    
     .press-header {
         text-align: center;
         border-bottom: 2px dashed #b82329;
         padding-bottom: 14px;
         margin-bottom: 22px;
     }
+    
     .leader-title {
         color: #dc2626;
         font-size: 26px;
@@ -40,6 +55,7 @@ st.markdown("""
         margin: 0;
         font-family: 'Ramabhadra', sans-serif;
     }
+    
     .party-title {
         color: #374151;
         font-size: 15px;
@@ -231,7 +247,7 @@ if "generated_note" in st.session_state:
     col1, col2 = st.columns(2)
     with col1:
         st.download_button(
-            label="📥 టెక్స్ట్ ఫైల్‌గా డౌన్‌లోడ్ చేయండి",
+            label="📥 టెక్స్ట్ ఫైల్‌‌గా డౌన్‌లోడ్ చేయండి",
             data=st.session_state["generated_note"],
             file_name=f"Tata_Madhu_Press_Note_{location.split()[0]}.txt",
             mime="text/plain",
