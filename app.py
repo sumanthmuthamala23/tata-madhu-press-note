@@ -1,6 +1,5 @@
 import os
 import time
-import json
 import base64
 import tempfile
 import urllib.parse
@@ -149,8 +148,8 @@ def google_transliterate_telugu(text: str) -> str:
             
     return " ".join(converted_words)
 
-# Dual-Key & Multi-Model Smart Router (Bypasses 503 & 404 permanently)
-def generate_press_note_failover(keys_list: list, parts: list, occasion: str, location: str):
+# Fully dynamic execution: pulls only live models from your account
+def generate_press_note_bulletproof(keys: list, parts: list, occasion: str, location: str):
     prompt_context = (
         f"\nప్రకటన విభాగం / స్వభావం: {occasion}\n"
         f"స్థలం: {location}\n"
@@ -159,26 +158,43 @@ def generate_press_note_failover(keys_list: list, parts: list, occasion: str, lo
     )
     full_parts = parts + [prompt_context]
 
-    last_err = None
+    last_error = None
     
-    for current_key in keys_list:
-        if not current_key or not current_key.strip():
+    for key in keys:
+        if not key or not key.strip():
             continue
         try:
-            client = genai.Client(api_key=current_key.strip())
+            client = genai.Client(api_key=key.strip())
             
-            # Fetch active remote models supported on this key
+            # 1. Fetch live models directly supported on this account
+            active_models = []
             try:
-                available = [m.name.replace("models/", "") for m in client.models.list()]
+                for m in client.models.list():
+                    name = m.name.replace("models/", "")
+                    # Filter for generation capable models
+                    methods = getattr(m, "supported_generation_methods", []) or []
+                    if not methods or "generateContent" in methods:
+                        active_models.append(name)
             except Exception:
-                available = []
-                
-            # Candidate models in order of speed and stability
-            priority = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-3.8-flash", "gemini-2.5-pro"]
-            models_to_test = [m for m in priority if m in available] if available else priority
+                pass
             
-            for model_name in models_to_test:
-                for attempt in range(2):
+            # Prefer 3.8-flash, 3.1-pro-preview, then any active model
+            ordered_pool = []
+            for preferred in ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3-flash", "gemini-2.0-flash"]:
+                if preferred in active_models:
+                    ordered_pool.append(preferred)
+            
+            # Add any other live flash/pro model returned by the API
+            for m in active_models:
+                if m not in ordered_pool and ("flash" in m or "pro" in m):
+                    ordered_pool.append(m)
+                    
+            if not ordered_pool:
+                ordered_pool = ["gemini-3.8-flash", "gemini-3.1-pro-preview"]
+
+            # 2. Iterate through strictly valid, active models
+            for model_name in ordered_pool:
+                for retry in range(2):
                     try:
                         response = client.models.generate_content(
                             model=model_name,
@@ -191,21 +207,21 @@ def generate_press_note_failover(keys_list: list, parts: list, occasion: str, lo
                         if response and response.text:
                             return response.text
                     except Exception as err:
-                        last_err = err
-                        time.sleep(1.0)
+                        last_error = err
+                        # If 503 high demand, back off briefly
+                        time.sleep(1.5)
                         continue
-        except Exception as key_err:
-            last_err = key_err
+        except Exception as client_err:
+            last_error = client_err
             continue
 
-    raise last_err
+    raise last_error
 
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/240px-BRS_Car_Symbol.png", width=80)
     st.title("సెట్టింగ్స్ (Settings)")
     
-    # Retrieve Secret keys or user inputs
     default_key = ""
     backup_key = ""
     try:
@@ -242,7 +258,6 @@ with st.sidebar:
     ]
     selected_scope = st.selectbox("ప్రకటన విభాగం / స్వభావం (Topic Scope)", topic_scopes)
 
-# Active key list: prioritizes entered key, then backup key from secrets
 active_keys = [api_key_input]
 if backup_key and backup_key != api_key_input:
     active_keys.append(backup_key)
@@ -252,7 +267,7 @@ st.title("🎙️ ఎమ్మెల్సీ తాతా మధుసూదన
 st.caption("వాయిస్ రికార్డింగ్, ఆడియో/వీడియో లేదా టెక్స్ట్ నోట్స్ ద్వారా మీడియా-రెడీ తెలుగు ప్రెస్ నోట్ రూపొందించండి.")
 
 if not api_key_input:
-    st.warning("ముందుగా సైడ్‌‌బార్‌లో మీ Gemini API Keyని నమోదు చేయండి.")
+    st.warning("ముందుగా సైడ్‌బార్‌లో మీ Gemini API Keyని నమోదు చేయండి.")
     st.stop()
 
 if "final_notes_area" not in st.session_state:
@@ -273,7 +288,7 @@ with tab1:
         )
 
 with tab2:
-    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్ అప్‌‌లోడ్ చేయండి:")
+    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్ అప్‌లోడ్ చేయండి:")
     uploaded_file = st.file_uploader(
         "సపోర్ట్ ఫార్మాట్లు: MP3, WAV, M4A, MP4", 
         type=["mp3", "wav", "m4a", "mp4"]
@@ -330,9 +345,9 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
     if not input_parts:
         st.error("⚠️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
     else:
-        with st.spinner("సర్వర్ కనెక్ట్ అవుతోంది... ఎమ్మెల్సీ గారి అధికారిక ప్రకటన సిద్ధమవుతోంది..."):
+        with st.spinner("సర్వర్‌తో కనెక్ట్ అవుతోంది... అధికారిక ప్రెస్ నోట్ సిద్ధమవుతోంది..."):
             try:
-                press_note_telugu = generate_press_note_failover(active_keys, input_parts, selected_scope, location)
+                press_note_telugu = generate_press_note_bulletproof(active_keys, input_parts, selected_scope, location)
                 st.session_state["draft_note"] = press_note_telugu
                 st.session_state["final_note"] = press_note_telugu
                 st.session_state["is_finalized"] = False
