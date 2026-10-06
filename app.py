@@ -576,7 +576,6 @@ if not api_key_input:
     st.warning("ముందుగా సైడ్‌బార్‌లో మీ Gemini API Keyని నమోదు చేయండి.")
     st.stop()
 
-# Persistent state storage
 if "audio_file_payload" not in st.session_state:
     st.session_state["audio_file_payload"] = None
 
@@ -597,7 +596,7 @@ if input_mode == "📁 ఆడియో / వీడియో ఫైల్ అప�
     col_f1, col_f2 = st.columns([3, 1])
     with col_f1:
         uploaded_file = st.file_uploader(
-            "ఆడియో లేదా వీడియో ఫైల్ ఎంచుకోండి:",
+            "ఆడియో లేదా వీడియో ఫైల్ ఎంచుకోండి (.m4a, .mp3, .wav, .mp4, etc.):",
             type=None,
             key="pinned_mobile_audio_uploader"
         )
@@ -612,7 +611,7 @@ if input_mode == "📁 ఆడియో / వీడియో ఫైల్ అప�
         f_name = uploaded_file.name
         fn_low = f_name.lower()
 
-        # Normalize MIME types
+        # Direct MIME normalization
         if fn_low.endswith((".m4a", ".aac")) or "m4a" in (uploaded_file.type or "").lower():
             clean_mime = "audio/mp4"
         elif fn_low.endswith(".mp3"):
@@ -632,7 +631,7 @@ if input_mode == "📁 ఆడియో / వీడియో ఫైల్ అప�
 
     if st.session_state.get("audio_file_payload"):
         fn, fb, fm = st.session_state["audio_file_payload"]
-        st.success(f"✅ ఫైల్ విజయవంతంగా సిద్ధమైంది: **{fn}** ({len(fb)/(1024*1024):.2f} MB)")
+        st.success(f"✅ ఫైల్ సిద్ధంగా ఉంది: **{fn}** ({len(fb)/(1024*1024):.2f} MB)")
 
 elif input_mode == "🎤 లైవ్ రికార్డింగ్ (Mic)":
     st.markdown("##### మైక్ ద్వారా మాట్లాడి రికార్డ్ చేయండి:")
@@ -699,7 +698,7 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
             input_parts.append(types.Part.from_bytes(data=fb, mime_type=fm))
 
     if not input_parts:
-        st.error("⚠️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
+        st.error("⚠️️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
     else:
         with st.spinner("ఎమ్మెల్సీ గారి అధికారిక ప్రకటన సిద్ధమవుతోంది (AI Analyzing Media)..."):
             try:
@@ -720,7 +719,7 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
 
 # Display, Edit & AI Suggestion Refinement Section
 if "draft_note" in st.session_state:
-    st.subheader("✏️ ఎడిట్ & AI సలహాలు (Edit & AI Remarks)")
+    st.subheader("✏️️ ఎడిట్ & AI సలహాలు (Edit & AI Remarks)")
     
     edited_note = st.text_area(
         "ముసాయిదాను ఇక్కడ పరిశీలించి నేరుగా సవరించవచ్చు:",
