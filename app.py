@@ -1,15 +1,15 @@
 import os
 import io
 import time
-import json
 import base64
 import tempfile
 import datetime
 import urllib.parse
 import requests
 import streamlit as st
+from PIL import Image
 from docx import Document
-from docx.shared import Pt, Inches, RGBColor
+from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from google import genai
 from google.genai import types
@@ -28,16 +28,33 @@ def get_base64_image(image_path):
             return base64.b64encode(img_file.read()).decode()
     return None
 
+# Crop top header from letterhead.png (Top ~18%) so it acts as a banner
+def get_cropped_letterhead_banner(image_path):
+    if os.path.exists(image_path):
+        try:
+            with Image.open(image_path) as img:
+                width, height = img.size
+                # Crop top 19% containing the MLC credentials and emblem
+                header_box = (0, 0, width, int(height * 0.19))
+                cropped = img.crop(header_box)
+                buffer = io.BytesIO()
+                cropped.save(buffer, format="PNG")
+                return base64.b64encode(buffer.getvalue()).decode()
+        except Exception:
+            return get_base64_image(image_path)
+    return None
+
 bg_image_base64 = get_base64_image("background.png")
 dev_image_base64 = get_base64_image("Sumanth.jpg") or get_base64_image("sumanth.jpg")
 
-# Search letterhead file
+# Locate letterhead file
 lh_filename = None
 for fname in ["letterhead.png", "letter head(2).jpg", "letterhead.jpg"]:
     if os.path.exists(fname):
         lh_filename = fname
         break
-lh_image_base64 = get_base64_image(lh_filename) if lh_filename else None
+
+lh_banner_base64 = get_cropped_letterhead_banner(lh_filename) if lh_filename else None
 
 if bg_image_base64:
     bg_style = f"""
@@ -81,12 +98,12 @@ st.markdown(f"""
         border-radius: 8px !important;
     }}
 
-    /* Official Letterhead Container matching A4 */
+    /* Official Letterhead Container matching A4 sheet */
     .letterhead-container {{
         background-color: #ffffff;
         border: 1.5px solid #e2e8f0;
         border-radius: 6px;
-        padding: 30px 48px;
+        padding: 35px 50px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.08);
         color: #111111;
         line-height: 1.95;
@@ -95,19 +112,14 @@ st.markdown(f"""
         margin: 0 auto;
     }}
 
-    .letterhead-banner-wrapper {{
-        width: 100%;
-        overflow: hidden;
-        max-height: 175px;
-        margin-bottom: 20px;
-        border-bottom: 2px solid #b82329;
-        padding-bottom: 10px;
-    }}
-
     .letterhead-banner-img {{
         width: 100%;
-        object-fit: cover;
-        object-position: top center;
+        max-height: 175px;
+        object-fit: contain;
+        display: block;
+        margin: 0 auto 18px auto;
+        border-bottom: 2px solid #b82329;
+        padding-bottom: 8px;
     }}
 
     /* Developer Attribution Badge */
@@ -279,14 +291,10 @@ def create_docx_press_note(text: str, date_str: str, location_str: str) -> io.By
     bio.seek(0)
     return bio
 
-# Printable HTML Template with Top Banner Crop
+# Printable HTML Template
 def get_printable_letterhead_html(content: str, date_str: str, location_str: str, lh_base64: str) -> str:
     if lh_base64:
-        header_html = f"""
-        <div style="width: 100%; max-height: 180px; overflow: hidden; border-bottom: 2px solid #b82329; margin-bottom: 20px;">
-            <img src="data:image/png;base64,{lh_base64}" style="width: 100%; object-fit: cover; object-position: top center;" />
-        </div>
-        """
+        header_html = f'<img src="data:image/png;base64,{lh_base64}" style="width: 100%; max-height: 180px; object-fit: contain; margin-bottom: 18px; border-bottom: 2px solid #b82329; padding-bottom: 8px;" />'
     else:
         header_html = """
         <div style="border-bottom: 2px solid #b82329; padding-bottom: 12px; margin-bottom: 20px;">
@@ -311,63 +319,62 @@ def get_printable_letterhead_html(content: str, date_str: str, location_str: str
         </div>
         """
 
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>MLC Tata Madhusudhan Press Note</title>
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@400;600;700;800&display=swap');
-            body {{
-                font-family: 'Anek Telugu', sans-serif;
-                background-color: #ffffff;
-                margin: 0;
-                padding: 40px;
-                color: #111;
-            }}
-            .container {{
-                max-width: 800px;
-                margin: 0 auto;
-                padding: 10px 20px;
-            }}
-            .meta {{
-                text-align: right;
-                font-weight: 600;
-                font-size: 15px;
-                margin-bottom: 18px;
-                color: #374151;
-            }}
-            .content {{
-                font-size: 17px;
-                line-height: 1.95;
-            }}
-            @media print {{
-                body {{ padding: 0; }}
-                .container {{ border: none; padding: 0; }}
-                .no-print {{ display: none; }}
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="no-print" style="text-align: center; margin-bottom: 25px;">
-            <button onclick="window.print()" style="padding: 12px 28px; font-size: 16px; font-weight: bold; background-color: #b82329; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                🖨️ నేరుగా ప్రింట్ / PDF తీయండి (Print or Save as PDF)
-            </button>
-        </div>
-        <div class="container">
-            {header_html}
-            <div class="meta">స్థలం: {location_str} | తేదీ: {date_str}</div>
-            <div class="content">
-                {content.replace(chr(10), '<br>')}
-            </div>
-            <div style="border-top: 1px dashed #b82329; margin-top: 35px; padding-top: 12px; text-align: right; font-weight: bold; color: #444;">
-                విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం
-            </div>
-        </div>
-    </body>
-    </html>
-    """
+    clean_content = content.replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>MLC Tata Madhusudhan Press Note</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@400;600;700;800&display=swap');
+    body {{
+        font-family: 'Anek Telugu', sans-serif;
+        background-color: #ffffff;
+        margin: 0;
+        padding: 40px;
+        color: #111;
+    }}
+    .container {{
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 10px 20px;
+    }}
+    .meta {{
+        text-align: right;
+        font-weight: 600;
+        font-size: 15px;
+        margin-bottom: 18px;
+        color: #374151;
+    }}
+    .content {{
+        font-size: 17px;
+        line-height: 1.95;
+    }}
+    @media print {{
+        body {{ padding: 0; }}
+        .container {{ border: none; padding: 0; }}
+        .no-print {{ display: none; }}
+    }}
+</style>
+</head>
+<body>
+<div class="no-print" style="text-align: center; margin-bottom: 25px;">
+    <button onclick="window.print()" style="padding: 12px 28px; font-size: 16px; font-weight: bold; background-color: #b82329; color: white; border: none; border-radius: 6px; cursor: pointer;">
+        🖨️ నేరుగా ప్రింట్ / PDF తీయండి (Print or Save as PDF)
+    </button>
+</div>
+<div class="container">
+    {header_html}
+    <div class="meta">స్థలం: {location_str} &nbsp;|&nbsp; తేదీ: {date_str}</div>
+    <div class="content">
+        {clean_content}
+    </div>
+    <div style="border-top: 1px dashed #b82329; margin-top: 35px; padding-top: 12px; text-align: right; font-weight: bold; color: #444;">
+        విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం
+    </div>
+</div>
+</body>
+</html>"""
 
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
@@ -522,7 +529,7 @@ st.divider()
 
 if st.button("🚀 పత్రికా ప్రకటనను రూపొందించండి (Generate Press Note)", type="primary", use_container_width=True):
     if not input_parts:
-        st.error("⚠️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
+        st.error("⚠️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
     else:
         with st.spinner("అధికారిక ప్రెస్ నోట్ సిద్ధమవుతోంది..."):
             try:
@@ -595,14 +602,10 @@ if st.session_state.get("is_finalized", False):
     st.divider()
     st.subheader("📄 అధికారిక లెటర్‌హెడ్ వీక్షణ (Official Letterhead View)")
     
-    if lh_image_base64:
-        banner_view = f"""
-        <div class="letterhead-banner-wrapper">
-            <img src="data:image/png;base64,{lh_image_base64}" class="letterhead-banner-img" alt="Official Letterhead">
-        </div>
-        """
+    if lh_banner_base64:
+        banner_img_html = f'<img src="data:image/png;base64,{lh_banner_base64}" class="letterhead-banner-img" alt="Official Letterhead">'
     else:
-        banner_view = """
+        banner_img_html = """
         <div style="border-bottom: 2px solid #b82329; padding-bottom: 12px; margin-bottom: 20px;">
             <table style="width: 100%;">
                 <tr>
@@ -625,20 +628,28 @@ if st.session_state.get("is_finalized", False):
         </div>
         """
 
-    st.markdown(f"""
-    <div class="letterhead-container">
-        {banner_view}
-        <div style="text-align: right; font-weight: 600; font-size: 15px; margin-bottom: 20px; color: #374151;">
-            స్థలం: {final_location} &nbsp;|&nbsp; తేదీ: {formatted_date}
-        </div>
-        <div style="line-height: 1.95; font-size: 18px;">
-            {final_content.replace(chr(10), '<br>')}
-        </div>
-        <div style="border-top: 1.5px dashed #b82329; margin-top: 30px; padding-top: 14px; text-align: right; font-size: 15px; font-weight: 700; color: #374151;">
-            విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    formatted_body = (
+        final_content.replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("**", "")
+        .replace("\n", "<br>")
+    )
+
+    # Clean rendering without markdown indentation bugs
+    canvas_html = f"""<div class="letterhead-container">
+{banner_img_html}
+<div style="text-align: right; font-weight: 600; font-size: 15px; margin-bottom: 20px; color: #374151;">
+స్థలం: {final_location} &nbsp;|&nbsp; తేదీ: {formatted_date}
+</div>
+<div style="line-height: 1.95; font-size: 18px;">
+{formatted_body}
+</div>
+<div style="border-top: 1.5px dashed #b82329; margin-top: 30px; padding-top: 14px; text-align: right; font-size: 15px; font-weight: 700; color: #374151;">
+విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం
+</div>
+</div>"""
+
+    st.markdown(canvas_html, unsafe_allow_html=True)
     
     st.write("")
     
@@ -656,7 +667,7 @@ if st.session_state.get("is_finalized", False):
         )
         
     with col_d2:
-        html_page = get_printable_letterhead_html(final_content, formatted_date, final_location, lh_image_base64)
+        html_page = get_printable_letterhead_html(final_content, formatted_date, final_location, lh_banner_base64)
         st.download_button(
             label="🖨️ PDF / Print File (.HTML)",
             data=html_page,
