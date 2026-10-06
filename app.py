@@ -30,7 +30,7 @@ def get_base64_image(image_path):
             return base64.b64encode(img_file.read()).decode()
     return None
 
-# Crop top header from letterhead.png (Top ~18-19%) so it renders as a banner
+# Crop top header from letterhead.png (Top ~18-19%) so it renders as a clean banner
 def get_cropped_letterhead_banner(image_path):
     if os.path.exists(image_path):
         try:
@@ -57,10 +57,11 @@ for fname in ["letterhead.png", "letter head(2).jpg", "letterhead.jpg"]:
 
 lh_banner_base64 = get_cropped_letterhead_banner(lh_filename) if lh_filename else None
 
+# Background styling: Soft tinted overlay with clean focus
 if bg_image_base64:
     bg_style = f"""
     .stApp {{
-        background: linear-gradient(rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.93)),
+        background: linear-gradient(135deg, rgba(255, 245, 248, 0.96) 0%, rgba(255, 255, 255, 0.97) 100%),
                     url("data:image/png;base64,{bg_image_base64}");
         background-size: cover;
         background-position: center top;
@@ -71,42 +72,102 @@ if bg_image_base64:
 else:
     bg_style = """
     .stApp {
-        background: linear-gradient(135deg, #fff5f8 0%, #ffedf2 40%, #ffffff 100%);
+        background: linear-gradient(135deg, #fff1f5 0%, #ffffff 50%, #fff5f8 100%);
         background-attachment: fixed;
     }
     """
 
-# Fully Responsive Mobile & iPad Styling with Anek Telugu Font
+# Custom Styling: Fixes the double_arrow_right icon ligature and unifies appearance
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@300;400;500;600;700;800&display=swap');
     
     {bg_style}
     
-    html, body, [class*="css"], .stMarkdown, p, span, div, input, textarea, button {{
-        font-family: 'Anek Telugu', sans-serif !important;
+    /* Apply Anek Telugu selectively to text elements to avoid breaking Streamlit Material Icons */
+    html, body, p, span, div:not([data-testid="stIconMaterial"]), h1, h2, h3, h4, h5, h6, input, textarea, button {{
+        font-family: 'Anek Telugu', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }}
 
+    /* Fix Streamlit Material Icons rendering (prevents 'double_arrow_right' text bug) */
+    span[data-testid="stIconMaterial"], .material-symbols-rounded, .material-symbols-outlined {{
+        font-family: 'Material Symbols Rounded', 'Material Symbols Outlined' !important;
+        font-size: 22px !important;
+        line-height: 1 !important;
+        letter-spacing: normal !important;
+        text-transform: none !important;
+        white-space: nowrap !important;
+        direction: ltr !important;
+    }}
+
+    /* Left Sidebar Styling */
     section[data-testid="stSidebar"] {{
-        background-color: rgba(255, 242, 245, 0.97) !important;
-        border-right: 1.5px solid #ffccd5;
+        background-color: #fff4f7 !important;
+        border-right: 1.5px solid #fed7e2;
+        box-shadow: 2px 0 12px rgba(225, 29, 72, 0.04);
     }}
 
+    /* App Header Banner */
+    .header-card {{
+        background: linear-gradient(90deg, #991b1b 0%, #be123c 100%);
+        color: #ffffff !important;
+        padding: 22px 28px;
+        border-radius: 14px;
+        box-shadow: 0 6px 20px rgba(184, 35, 41, 0.18);
+        margin-bottom: 24px;
+    }}
+    .header-card h1 {{
+        color: #ffffff !important;
+        font-size: 26px !important;
+        font-weight: 800 !important;
+        margin: 0 !important;
+        line-height: 1.3 !important;
+    }}
+    .header-card p {{
+        color: #fce7f3 !important;
+        font-size: 14px !important;
+        margin: 6px 0 0 0 !important;
+        font-weight: 500 !important;
+    }}
+
+    /* Input Controls & Cards */
     .stTextInput>div>div>input, .stTextArea>div>div>textarea {{
         background-color: #ffffff !important;
-        color: #111111 !important;
+        color: #0f172a !important;
         border: 1.5px solid #cbd5e1 !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         font-size: 16px !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+    }}
+    .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {{
+        border-color: #be123c !important;
+        box-shadow: 0 0 0 2px rgba(190, 18, 60, 0.15) !important;
     }}
 
-    /* Responsive Letterhead Container */
+    /* Primary Action Buttons */
+    div.stButton > button[kind="primary"] {{
+        background: linear-gradient(90deg, #991b1b 0%, #be123c 100%) !important;
+        color: #ffffff !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        border: none !important;
+        border-radius: 10px !important;
+        padding: 12px 24px !important;
+        box-shadow: 0 4px 14px rgba(190, 18, 60, 0.3) !important;
+        transition: all 0.2s ease !important;
+    }}
+    div.stButton > button[kind="primary"]:hover {{
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(190, 18, 60, 0.45) !important;
+    }}
+
+    /* Official Letterhead Container */
     .letterhead-container {{
         background-color: #ffffff;
-        border: 1.5px solid #e2e8f0;
+        border: 1.5px solid #cbd5e1;
         border-radius: 8px;
-        padding: 35px 45px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        padding: 35px 48px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.07);
         color: #111111;
         line-height: 1.95;
         font-size: 18px;
@@ -131,10 +192,10 @@ st.markdown(f"""
         align-items: center;
         gap: 12px;
         background: #ffffff;
-        border: 1.5px solid #fecdd3;
-        border-radius: 12px;
+        border: 1.5px solid #fbcfe8;
+        border-radius: 14px;
         padding: 10px 14px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.04);
         margin-top: 15px;
     }}
     .dev-img {{
@@ -142,25 +203,31 @@ st.markdown(f"""
         height: 52px;
         border-radius: 50%;
         object-fit: cover;
-        border: 2px solid #b82329;
+        border: 2px solid #be123c;
         flex-shrink: 0;
     }}
     .dev-text {{
         font-size: 13px;
         font-weight: 700;
-        color: #1f2937;
+        color: #1e293b;
         line-height: 1.25;
     }}
     .dev-sub {{
         font-size: 11px;
-        color: #b82329;
+        color: #be123c;
         font-weight: 600;
         margin-top: 3px;
         line-height: 1.3;
     }}
 
-    /* Mobile & Tablet Fluid Adjustments */
+    /* Mobile & Tablet Adjustments */
     @media screen and (max-width: 768px) {{
+        .header-card {{
+            padding: 16px 18px !important;
+        }}
+        .header-card h1 {{
+            font-size: 20px !important;
+        }}
         .letterhead-container {{
             padding: 18px 16px !important;
             font-size: 16px !important;
@@ -169,13 +236,6 @@ st.markdown(f"""
         .letterhead-banner-img {{
             max-height: 110px !important;
             margin-bottom: 10px !important;
-        }}
-        .dev-badge {{
-            padding: 8px 10px !important;
-        }}
-        .dev-img {{
-            width: 44px !important;
-            height: 44px !important;
         }}
     }}
 </style>
@@ -407,7 +467,7 @@ def get_printable_letterhead_html(content: str, date_str: str, location_str: str
 
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/240px-BRS_Car_Symbol.png", width=75)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/BRS_Car_Symbol.png/240px-BRS_Car_Symbol.png", width=80)
     st.title("సెట్టింగ్స్ (Settings)")
     
     default_key = ""
@@ -462,7 +522,7 @@ with st.sidebar:
 
     # Developer Attribution Badge in Sidebar
     st.markdown("---")
-    dev_img_html = f'<img src="data:image/jpeg;base64,{dev_image_base64}" class="dev-img">' if dev_image_base64 else '<span style="font-size:24px;">👨‍💻</span>'
+    dev_img_html = f'<img src="data:image/jpeg;base64,{dev_image_base64}" class="dev-img">' if dev_image_base64 else '<span style="font-size:26px;">👨‍💻</span>'
     st.markdown(f"""
     <div class="dev-badge">
         {dev_img_html}
@@ -478,8 +538,12 @@ if backup_key and backup_key != api_key_input:
     active_keys.append(backup_key)
 
 # ----------------- MAIN UI -----------------
-st.title("🎙️ ఎమ్మెల్సీ తాతా మధుసూదన్ - పత్రికా ప్రకటన జనరేటర్")
-st.caption(f"తేదీ: {formatted_date} | స్థలం: {final_location} | అధికారిక లెటర్‌హెడ్ ఫార్మాట్")
+st.markdown(f"""
+<div class="header-card">
+    <h1>🎙️ ఎమ్మెల్సీ తాతా మధుసూదన్ — అధికారిక పత్రికా ప్రకటన కన్సోల్</h1>
+    <p>తేదీ: {formatted_date} &nbsp;|&nbsp; స్థలం: {final_location} &nbsp;|&nbsp; శాసనమండలి మీడియా సమన్వయ విభాగం</p>
+</div>
+""", unsafe_allow_html=True)
 
 if not api_key_input:
     st.warning("ముందుగా సైడ్‌బార్‌లో మీ Gemini API Keyని నమోదు చేయండి.")
@@ -514,7 +578,6 @@ with tab2:
             file_bytes = uploaded_file.read()
             mime_type = uploaded_file.type or "audio/mp3"
             
-            # If the file is larger than 20MB, stream it via Gemini Files API
             if len(file_bytes) > 20 * 1024 * 1024:
                 with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_file.name) as tmp:
                     tmp.write(file_bytes)
@@ -632,7 +695,7 @@ if st.session_state.get("is_finalized", False):
     final_content = st.session_state.get("final_note", "")
     
     st.divider()
-    st.subheader("📄 అధికారిక లెటర్‌హెడ్ వీక్షణ (Official Letterhead View)")
+    st.subheader("📄 అధికారిక లెటర్‌‌హెడ్ వీక్షణ (Official Letterhead View)")
     
     if lh_banner_base64:
         banner_img_html = f'<img src="data:image/png;base64,{lh_banner_base64}" class="letterhead-banner-img" alt="Official Letterhead">'
@@ -684,7 +747,6 @@ if st.session_state.get("is_finalized", False):
     
     st.write("")
     
-    # Direct Downloads
     col_d1, col_d2, col_d3 = st.columns(3)
     
     with col_d1:
@@ -758,13 +820,13 @@ if st.session_state.get("is_finalized", False):
 
 # Footer Developer Attribution
 st.markdown("---")
-dev_footer_img = f'<img src="data:image/jpeg;base64,{dev_image_base64}" style="width: 36px; height: 36px; border-radius: 50%; vertical-align: middle; margin-right: 10px; border: 1.5px solid #b82329;">' if dev_image_base64 else '👨‍💻 '
+dev_footer_img = f'<img src="data:image/jpeg;base64,{dev_image_base64}" style="width: 36px; height: 36px; border-radius: 50%; vertical-align: middle; margin-right: 10px; border: 1.5px solid #be123c;">' if dev_image_base64 else '👨‍💻 '
 st.markdown(
     f"""
     <div style="text-align: center; color: #374151; font-size: 14px; padding: 18px 0;">
         {dev_footer_img}
         <strong>Designed & Developed by Sumanth Muthamala</strong> &nbsp;|&nbsp; 
-        <span style="color: #b82329; font-weight: 600;">Revenue Inspector & PA to MLC Khammam</span>
+        <span style="color: #be123c; font-weight: 600;">Revenue Inspector & PA to MLC Khammam</span>
     </div>
     """, 
     unsafe_allow_html=True
