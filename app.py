@@ -6,6 +6,8 @@ import urllib.parse
 import streamlit as st
 from google import genai
 from google.genai import types
+from indic_transliteration import sanscript
+from indic_transliteration.sanscript import SchemeMap, SCHEMES, transliterate
 
 # Page setup
 st.set_page_config(
@@ -123,51 +125,12 @@ SYSTEM_INSTRUCTION = (
 def get_client(api_key: str):
     return genai.Client(api_key=api_key)
 
-# Failover execution: cycles through available responsive models to prevent 503/404 errors
-def execute_with_failover(client: genai.Client, contents, system_instruction=None, temperature=0.3):
-    models_to_try = [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-3.8-flash",
-        "gemini-2.5-pro",
-        "gemini-2.0-flash-exp"
-    ]
-    
-    last_exception = None
-    for model_name in models_to_try:
-        try:
-            config = types.GenerateContentConfig(
-                temperature=temperature,
-            )
-            if system_instruction:
-                config.system_instruction = system_instruction
-                
-            response = client.models.generate_content(
-                model=model_name,
-                contents=contents,
-                config=config,
-            )
-            if response and response.text:
-                return response.text
-        except Exception as e:
-            last_exception = e
-            time.sleep(0.5)
-            continue
-            
-    raise last_exception
-
-# English to Telugu Transliteration Function
-def transliterate_to_telugu(client: genai.Client, english_text: str):
-    prompt = (
-        "Translate and transliterate this English/Tanglish phonetic text into standard, "
-        "grammatically correct Telugu script:\n"
-        f'"{english_text}"\n\n'
-        "Rules:\n"
-        "- Output ONLY the clean Telugu script text.\n"
-        "- No English words unless they are proper technical/designation terms.\n"
-        "- No explanations or commentary."
-    )
-    return execute_with_failover(client, contents=prompt, temperature=0.1)
+# Local Offline Phonetic Conversion (100% Free, Instant, No API errors)
+def local_transliterate_to_telugu(text: str) -> str:
+    if not text.strip():
+        return ""
+    # Converts phonetic english/ITRANS to natural Telugu script
+    return transliterate(text, sanscript.ITRANS, sanscript.TELUGU)
 
 # Press Note Generation Function
 def generate_press_note(client: genai.Client, parts: list, occasion: str, location: str):
@@ -178,7 +141,17 @@ def generate_press_note(client: genai.Client, parts: list, occasion: str, locati
         "ఎమ్మెల్సీ తాతా మధుసూదన్ గారి అధికారిక పత్రికా ప్రకటనను రూపొందించండి.\n"
     )
     parts.append(prompt_context)
-    return execute_with_failover(client, contents=parts, system_instruction=SYSTEM_INSTRUCTION, temperature=0.3)
+    
+    # Stable generation call
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=parts,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_INSTRUCTION,
+            temperature=0.3,
+        ),
+    )
+    return response.text
 
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
@@ -251,7 +224,7 @@ with tab1:
         )
 
 with tab2:
-    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్ అప్‌‌లోడ్ చేయండి:")
+    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్ అప్‌లోడ్ చేయండి:")
     uploaded_file = st.file_uploader(
         "సపోర్ట్ ఫార్మాట్లు: MP3, WAV, M4A, MP4", 
         type=["mp3", "wav", "m4a", "mp4"]
@@ -279,20 +252,17 @@ with tab3:
     with st.expander("🔤 ఇంగ్లీష్/టాంగ్లీష్‌లో టైప్ చేసి తెలుగులోకి మార్చండి", expanded=True):
         raw_eng = st.text_area(
             "ఇంగ్లీష్ లేదా టాంగ్లీష్ (Tanglish) లో టైప్ చేయండి:",
-            placeholder="ఉదాహరణ: rythu bandu inka raledu, Tata Madhu garu mandapaddaru...",
+            placeholder="ఉదాహరణ: rythu bandhu inka raledu, Tata Madhu garu mandapaddaru...",
             height=80,
             key="raw_eng_text"
         )
-        if st.button("🔄 తెలుగులోకి మార్చండి (Convert to Telugu)"):
+        if st.button("🔄 తెలుగులోకి మార్చండి (Instant Local Convert)"):
             if raw_eng.strip():
-                with st.spinner("తెలుగులోకి మారుస్తోంది..."):
-                    try:
-                        telugu_converted = transliterate_to_telugu(client, raw_eng)
-                        st.session_state["telugu_notes"] = telugu_converted.strip()
-                        st.success("✅ విజయవంతంగా తెలుగులోకి మారింది!")
-                        st.rerun()
-                    except Exception as err:
-                        st.error(f"మార్పిడి ఎర్రర్: {str(err)}")
+                # Runs locally without external API latency or model errors
+                converted_telugu = local_transliterate_to_telugu(raw_eng)
+                st.session_state["telugu_notes"] = converted_telugu
+                st.success("✅ విజయవంతంగా తెలుగులోకి మారింది!")
+                st.rerun()
             else:
                 st.warning("దయచేసి ఇంగ్లీష్‌లో టెక్స్ట్ టైప్ చేయండి.")
 
