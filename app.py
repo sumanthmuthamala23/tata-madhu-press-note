@@ -1,6 +1,7 @@
 import os
 import io
 import time
+import json
 import base64
 import tempfile
 import datetime
@@ -19,22 +20,22 @@ st.set_page_config(
     page_title="MLC తాతా మధు - అధికారిక పత్రికా ప్రకటన కన్సోల్",
     page_icon="📰",
     layout="wide",
+    initial_sidebar_state="auto"
 )
 
-# Helper to read and encode local files to base64
+# Base64 Helper for images
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         with open(image_path, "rb") as img_file:
             return base64.b64encode(img_file.read()).decode()
     return None
 
-# Crop top header from letterhead.png (Top ~18%) so it acts as a banner
+# Crop top header from letterhead.png (Top ~18-19%) so it renders as a banner
 def get_cropped_letterhead_banner(image_path):
     if os.path.exists(image_path):
         try:
             with Image.open(image_path) as img:
                 width, height = img.size
-                # Crop top 19% containing the MLC credentials and emblem
                 header_box = (0, 0, width, int(height * 0.19))
                 cropped = img.crop(header_box)
                 buffer = io.BytesIO()
@@ -59,7 +60,7 @@ lh_banner_base64 = get_cropped_letterhead_banner(lh_filename) if lh_filename els
 if bg_image_base64:
     bg_style = f"""
     .stApp {{
-        background: linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.92)),
+        background: linear-gradient(rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.93)),
                     url("data:image/png;base64,{bg_image_base64}");
         background-size: cover;
         background-position: center top;
@@ -75,7 +76,7 @@ else:
     }
     """
 
-# Custom Styling with Anek Telugu Font
+# Fully Responsive Mobile & iPad Styling with Anek Telugu Font
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@300;400;500;600;700;800&display=swap');
@@ -87,7 +88,7 @@ st.markdown(f"""
     }}
 
     section[data-testid="stSidebar"] {{
-        background-color: rgba(255, 242, 245, 0.96) !important;
+        background-color: rgba(255, 242, 245, 0.97) !important;
         border-right: 1.5px solid #ffccd5;
     }}
 
@@ -96,28 +97,30 @@ st.markdown(f"""
         color: #111111 !important;
         border: 1.5px solid #cbd5e1 !important;
         border-radius: 8px !important;
+        font-size: 16px !important;
     }}
 
-    /* Official Letterhead Container matching A4 sheet */
+    /* Responsive Letterhead Container */
     .letterhead-container {{
         background-color: #ffffff;
         border: 1.5px solid #e2e8f0;
-        border-radius: 6px;
-        padding: 35px 50px;
+        border-radius: 8px;
+        padding: 35px 45px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.08);
         color: #111111;
         line-height: 1.95;
         font-size: 18px;
         max-width: 860px;
         margin: 0 auto;
+        box-sizing: border-box;
     }}
 
     .letterhead-banner-img {{
         width: 100%;
-        max-height: 175px;
+        max-height: 180px;
         object-fit: contain;
         display: block;
-        margin: 0 auto 18px auto;
+        margin: 0 auto 16px auto;
         border-bottom: 2px solid #b82329;
         padding-bottom: 8px;
     }}
@@ -132,11 +135,11 @@ st.markdown(f"""
         border-radius: 12px;
         padding: 10px 14px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        margin-top: 20px;
+        margin-top: 15px;
     }}
     .dev-img {{
-        width: 50px;
-        height: 50px;
+        width: 52px;
+        height: 52px;
         border-radius: 50%;
         object-fit: cover;
         border: 2px solid #b82329;
@@ -154,6 +157,26 @@ st.markdown(f"""
         font-weight: 600;
         margin-top: 3px;
         line-height: 1.3;
+    }}
+
+    /* Mobile & Tablet Fluid Adjustments */
+    @media screen and (max-width: 768px) {{
+        .letterhead-container {{
+            padding: 18px 16px !important;
+            font-size: 16px !important;
+            line-height: 1.75 !important;
+        }}
+        .letterhead-banner-img {{
+            max-height: 110px !important;
+            margin-bottom: 10px !important;
+        }}
+        .dev-badge {{
+            padding: 8px 10px !important;
+        }}
+        .dev-img {{
+            width: 44px !important;
+            height: 44px !important;
+        }}
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -204,7 +227,7 @@ def google_transliterate_telugu(text: str) -> str:
             converted_words.append(word)
     return " ".join(converted_words)
 
-# Resilient Generation with Dynamic Active Model Discovery
+# Resilient Multi-Key & Active Model Engine
 def generate_ai_response(keys: list, contents_list: list, system_instruction=SYSTEM_INSTRUCTION, temperature=0.3):
     last_error = None
     for key in keys:
@@ -291,10 +314,14 @@ def create_docx_press_note(text: str, date_str: str, location_str: str) -> io.By
     bio.seek(0)
     return bio
 
-# Printable HTML Template
+# Printable HTML Template with Top Banner Crop
 def get_printable_letterhead_html(content: str, date_str: str, location_str: str, lh_base64: str) -> str:
     if lh_base64:
-        header_html = f'<img src="data:image/png;base64,{lh_base64}" style="width: 100%; max-height: 180px; object-fit: contain; margin-bottom: 18px; border-bottom: 2px solid #b82329; padding-bottom: 8px;" />'
+        header_html = f"""
+        <div style="width: 100%; max-height: 180px; overflow: hidden; border-bottom: 2px solid #b82329; margin-bottom: 20px;">
+            <img src="data:image/png;base64,{lh_base64}" style="width: 100%; object-fit: cover; object-position: top center;" />
+        </div>
+        """
     else:
         header_html = """
         <div style="border-bottom: 2px solid #b82329; padding-bottom: 12px; margin-bottom: 20px;">
@@ -324,6 +351,7 @@ def get_printable_letterhead_html(content: str, date_str: str, location_str: str
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MLC Tata Madhusudhan Press Note</title>
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@400;600;700;800&display=swap');
@@ -331,13 +359,14 @@ def get_printable_letterhead_html(content: str, date_str: str, location_str: str
         font-family: 'Anek Telugu', sans-serif;
         background-color: #ffffff;
         margin: 0;
-        padding: 40px;
+        padding: 20px;
         color: #111;
     }}
     .container {{
         max-width: 800px;
         margin: 0 auto;
         padding: 10px 20px;
+        box-sizing: border-box;
     }}
     .meta {{
         text-align: right;
@@ -406,7 +435,7 @@ with st.sidebar:
         st.session_state["final_loc_key"] = "ఖమ్మం"
         
     loc_eng = st.text_input("ఇంగ్లీష్‌లో టైప్ చేయండి:", placeholder="e.g. Khammam, Palair, Hyderabad...", key="loc_eng_input")
-    if st.button("🔄 స్థలాన్ని తెలుగులోకి మార్చండి"):
+    if st.button("🔄 స్థలాన్ని తెలుగులోకి మార్చండి", use_container_width=True):
         if loc_eng.strip():
             converted_loc = google_transliterate_telugu(loc_eng)
             st.session_state["final_loc_key"] = converted_loc
@@ -474,29 +503,32 @@ with tab1:
         )
 
 with tab2:
-    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్ అప్‌లోడ్ చేయండి:")
-    uploaded_file = st.file_uploader(
-        "సపోర్ట్ ఫార్మాట్లు: MP3, WAV, M4A, MP4", 
-        type=["mp3", "wav", "m4a", "mp4"]
+    st.markdown("##### ఆడియో లేదా వీడియో ఫైల్స్ అప్‌లోడ్ చేయండి (Multiple Files up to 200MB):")
+    uploaded_files = st.file_uploader(
+        "సపోర్ట్ ఫార్మాట్లు: MP3, WAV, M4A, MP4 (ఎన్నైనా ఫైల్స్ ఎంచుకోవచ్చు)", 
+        type=["mp3", "wav", "m4a", "mp4"],
+        accept_multiple_files=True
     )
-    if uploaded_file:
-        file_bytes = uploaded_file.read()
-        mime_type = uploaded_file.type or "audio/mp3"
-        
-        if len(file_bytes) > 20 * 1024 * 1024:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_file.name) as tmp:
-                tmp.write(file_bytes)
-                tmp_path = tmp.name
-            with st.spinner("ఫైల్ అప్‌లోడ్ అవుతోంది..."):
-                c = genai.Client(api_key=active_keys[0])
-                uploaded_ref = c.files.upload(file=tmp_path)
-                input_parts.append(uploaded_ref)
-                os.remove(tmp_path)
-        else:
-            input_parts.append(
-                types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
-            )
-        st.success(f"✅ {uploaded_file.name} సిద్ధంగా ఉంది.")
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
+            file_bytes = uploaded_file.read()
+            mime_type = uploaded_file.type or "audio/mp3"
+            
+            # If the file is larger than 20MB, stream it via Gemini Files API
+            if len(file_bytes) > 20 * 1024 * 1024:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_file.name) as tmp:
+                    tmp.write(file_bytes)
+                    tmp_path = tmp.name
+                with st.spinner(f"పెద్ద ఫైల్ అప్‌లోడ్ అవుతోంది ({uploaded_file.name})..."):
+                    c = genai.Client(api_key=active_keys[0])
+                    uploaded_ref = c.files.upload(file=tmp_path)
+                    input_parts.append(uploaded_ref)
+                    os.remove(tmp_path)
+            else:
+                input_parts.append(
+                    types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
+                )
+        st.success(f"✅ {len(uploaded_files)} ఫైల్(లు) విజయవంతంగా లోడ్ అయ్యాయి!")
 
 with tab3:
     st.markdown("##### ఇంగ్లీష్ ➔ తెలుగు మార్పిడి (English Typing to Telugu):")
@@ -507,7 +539,7 @@ with tab3:
             height=85,
             key="raw_eng_text"
         )
-        if st.button("🔄 తెలుగులోకి మార్చండి (Convert to Telugu)"):
+        if st.button("🔄 తెలుగులోకి మార్చండి (Convert to Telugu)", use_container_width=True):
             if raw_eng.strip():
                 with st.spinner("తెలుగులోకి మారుస్తోంది..."):
                     converted = google_transliterate_telugu(raw_eng)
@@ -565,7 +597,7 @@ if "draft_note" in st.session_state:
             "మీ సూచన లేదా అభ్యర్థనను ఇక్కడ రాయండి (English or Telugu):",
             placeholder="e.g., 'రైతుల ఆవేదనను మరింత భావోద్వేగంగా మార్చండి', 'Add demand for immediate relief'..."
         )
-        if st.button("⚡ సూచన ఆధారంగా ప్రెస్ నోట్ తిరిగి రూపొందించండి (Re-generate with AI)"):
+        if st.button("⚡ సూచన ఆధారంగా ప్రెస్ నోట్ తిరిగి రూపొందించండి (Re-generate with AI)", use_container_width=True):
             if ai_remark.strip():
                 with st.spinner("మీ సూచన ప్రకారం ప్రెస్ నోట్‌ను సరిచేస్తోంది..."):
                     try:
@@ -635,7 +667,6 @@ if st.session_state.get("is_finalized", False):
         .replace("\n", "<br>")
     )
 
-    # Clean rendering without markdown indentation bugs
     canvas_html = f"""<div class="letterhead-container">
 {banner_img_html}
 <div style="text-align: right; font-weight: 600; font-size: 15px; margin-bottom: 20px; color: #374151;">
