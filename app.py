@@ -60,7 +60,7 @@ lh_banner_base64 = get_cropped_letterhead_banner(lh_filename) if lh_filename els
 if bg_image_base64:
     bg_style = f"""
     .stApp {{
-        background: linear-gradient(135deg, rgba(255, 245, 248, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%),
+        background: linear-gradient(135deg, rgba(248, 246, 252, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%),
                     url("data:image/png;base64,{bg_image_base64}");
         background-size: cover;
         background-position: center top;
@@ -71,18 +71,19 @@ if bg_image_base64:
 else:
     bg_style = """
     .stApp {
-        background: linear-gradient(135deg, #fff1f5 0%, #ffffff 50%, #fff5f8 100%);
+        background: linear-gradient(135deg, #f8f6fc 0%, #ffffff 50%, #f7f0fc 100%);
         background-attachment: fixed;
     }
     """
 
-# Custom CSS with Anek Telugu Font
+# Custom CSS: Royal Imperial Violet Palette & Typography
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@300;400;500;600;700;800&display=swap');
     
     {bg_style}
     
+    /* Font isolation */
     html, body, p, div:not([data-testid="stIconMaterial"]), h1, h2, h3, h4, h5, h6, input, textarea, button {{
         font-family: 'Anek Telugu', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }}
@@ -94,18 +95,20 @@ st.markdown(f"""
         white-space: nowrap !important;
     }}
 
+    /* Left Sidebar: Soft Tinted Lavender with Violet Border */
     section[data-testid="stSidebar"] {{
-        background-color: #fff2f6 !important;
-        border-right: 1.5px solid #fecdd3;
-        box-shadow: 2px 0 14px rgba(225, 29, 72, 0.05);
+        background-color: #f7effe !important;
+        border-right: 1.5px solid #d8b4fe !important;
+        box-shadow: 2px 0 14px rgba(88, 28, 135, 0.05);
     }}
 
+    /* Main Console Header: Royal Deep Violet Gradient */
     .header-card {{
-        background: linear-gradient(90deg, #991b1b 0%, #be123c 65%, #e11d48 100%);
+        background: linear-gradient(90deg, #3b0764 0%, #581c87 65%, #7e22ce 100%) !important;
         color: #ffffff !important;
         padding: 22px 30px;
         border-radius: 14px;
-        box-shadow: 0 8px 24px rgba(184, 35, 41, 0.22);
+        box-shadow: 0 8px 24px rgba(59, 7, 100, 0.25);
         margin-bottom: 24px;
         border: 1px solid rgba(255, 255, 255, 0.2);
     }}
@@ -117,12 +120,13 @@ st.markdown(f"""
         line-height: 1.3 !important;
     }}
     .header-card p {{
-        color: #ffe4e6 !important;
+        color: #f3e8ff !important;
         font-size: 14px !important;
         margin: 6px 0 0 0 !important;
         font-weight: 500 !important;
     }}
 
+    /* Input Controls */
     .stTextInput>div>div>input, .stTextArea>div>div>textarea {{
         background-color: #ffffff !important;
         color: #0f172a !important;
@@ -132,29 +136,31 @@ st.markdown(f"""
         box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
     }}
     .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {{
-        border-color: #be123c !important;
-        box-shadow: 0 0 0 2px rgba(190, 18, 60, 0.15) !important;
+        border-color: #7e22ce !important;
+        box-shadow: 0 0 0 2px rgba(126, 34, 206, 0.18) !important;
     }}
 
+    /* Primary Action Buttons: Rich Imperial Purple to Vibrant Violet */
     div.stButton > button[kind="primary"] {{
-        background: linear-gradient(90deg, #991b1b 0%, #be123c 100%) !important;
+        background: linear-gradient(90deg, #4c1d95 0%, #7e22ce 100%) !important;
         color: #ffffff !important;
         font-size: 16px !important;
         font-weight: 700 !important;
         border: none !important;
         border-radius: 10px !important;
         padding: 12px 24px !important;
-        box-shadow: 0 4px 14px rgba(190, 18, 60, 0.3) !important;
+        box-shadow: 0 4px 14px rgba(126, 34, 206, 0.35) !important;
         transition: all 0.2s ease !important;
     }}
     div.stButton > button[kind="primary"]:hover {{
         transform: translateY(-1px);
-        box-shadow: 0 6px 18px rgba(190, 18, 60, 0.45) !important;
+        box-shadow: 0 6px 18px rgba(126, 34, 206, 0.5) !important;
     }}
 
+    /* Official Letterhead Container */
     .letterhead-container {{
         background-color: #ffffff;
-        border: 1.5px solid #cbd5e1;
+        border: 1.5px solid #e2e8f0;
         border-radius: 8px;
         padding: 35px 48px;
         box-shadow: 0 8px 30px rgba(0,0,0,0.08);
@@ -172,16 +178,17 @@ st.markdown(f"""
         object-fit: contain;
         display: block;
         margin: 0 auto 16px auto;
-        border-bottom: 2px solid #b82329;
+        border-bottom: 2px solid #581c87;
         padding-bottom: 8px;
     }}
 
+    /* Developer Attribution Badge */
     .dev-badge {{
         display: flex;
         align-items: center;
         gap: 12px;
         background: #ffffff;
-        border: 1.5px solid #fecdd3;
+        border: 1.5px solid #e9d5ff;
         border-radius: 14px;
         padding: 10px 14px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.04);
@@ -192,7 +199,7 @@ st.markdown(f"""
         height: 52px;
         border-radius: 50%;
         object-fit: cover;
-        border: 2px solid #be123c;
+        border: 2px solid #7e22ce;
         flex-shrink: 0;
     }}
     .dev-text {{
@@ -203,12 +210,13 @@ st.markdown(f"""
     }}
     .dev-sub {{
         font-size: 11px;
-        color: #be123c;
+        color: #6b21a8;
         font-weight: 600;
         margin-top: 3px;
         line-height: 1.3;
     }}
 
+    /* Sidebar Badge */
     .sidebar-emblem-card {{
         display: flex;
         align-items: center;
@@ -216,24 +224,24 @@ st.markdown(f"""
         background: #ffffff;
         padding: 10px 14px;
         border-radius: 12px;
-        border: 1.5px solid #fecdd3;
+        border: 1.5px solid #d8b4fe;
         margin-bottom: 15px;
     }}
     .sidebar-emblem-icon {{
         font-size: 30px;
-        background: #fff1f5;
+        background: #f3e8ff;
         border-radius: 8px;
         padding: 4px 8px;
     }}
     .sidebar-emblem-title {{
         font-weight: 800;
-        color: #be123c;
+        color: #4c1d95;
         font-size: 17px;
         line-height: 1.2;
     }}
     .sidebar-emblem-subtitle {{
         font-size: 12px;
-        color: #64748b;
+        color: #6b21a8;
         font-weight: 600;
     }}
 
@@ -304,10 +312,9 @@ def google_transliterate_telugu(text: str) -> str:
             converted_words.append(word)
     return " ".join(converted_words)
 
-# High-Speed Production AI Engine
+# High-Speed Production AI Engine (Using Google Recommended Active Models)
 def generate_ai_response(keys: list, contents_list: list, system_instruction=SYSTEM_INSTRUCTION, temperature=0.3):
     last_error = None
-    # Verified active low-latency models for google-genai SDK
     active_models = ["gemini-3.5-flash-lite", "gemini-3.5-flash"]
     
     for key in keys:
@@ -346,7 +353,7 @@ def create_docx_press_note(text: str, date_str: str, location_str: str) -> io.By
     run_name.font.name = "Arial"
     run_name.font.size = Pt(16)
     run_name.bold = True
-    run_name.font.color.rgb = RGBColor(184, 35, 41)
+    run_name.font.color.rgb = RGBColor(88, 28, 135)
     
     run_desig = p_header.add_run("M.L.C\nKhammam, Telangana\n")
     run_desig.font.name = "Arial"
@@ -381,17 +388,17 @@ def create_docx_press_note(text: str, date_str: str, location_str: str) -> io.By
 def get_printable_letterhead_html(content: str, date_str: str, location_str: str, lh_base64: str) -> str:
     if lh_base64:
         header_html = f"""
-        <div style="width: 100%; max-height: 180px; overflow: hidden; border-bottom: 2px solid #b82329; margin-bottom: 20px;">
+        <div style="width: 100%; max-height: 180px; overflow: hidden; border-bottom: 2px solid #581c87; margin-bottom: 20px;">
             <img src="data:image/png;base64,{lh_base64}" style="width: 100%; object-fit: cover; object-position: top center;" />
         </div>
         """
     else:
         header_html = """
-        <div style="border-bottom: 2px solid #b82329; padding-bottom: 12px; margin-bottom: 20px;">
+        <div style="border-bottom: 2px solid #581c87; padding-bottom: 12px; margin-bottom: 20px;">
             <table style="width: 100%;">
                 <tr>
                     <td style="width: 40%; vertical-align: top;">
-                        <h2 style="color: #b82329; margin: 0; font-size: 22px; font-weight: 800;">TATA MADHUSUDHAN</h2>
+                        <h2 style="color: #581c87; margin: 0; font-size: 22px; font-weight: 800;">TATA MADHUSUDHAN</h2>
                         <div style="font-size: 15px; font-weight: bold;">M.L.C</div>
                         <div style="font-size: 13px; color: #555;">Khammam, Telangana</div>
                     </td>
@@ -451,7 +458,7 @@ def get_printable_letterhead_html(content: str, date_str: str, location_str: str
 </head>
 <body>
 <div class="no-print" style="text-align: center; margin-bottom: 25px;">
-    <button onclick="window.print()" style="padding: 12px 28px; font-size: 16px; font-weight: bold; background-color: #b82329; color: white; border: none; border-radius: 6px; cursor: pointer;">
+    <button onclick="window.print()" style="padding: 12px 28px; font-size: 16px; font-weight: bold; background-color: #581c87; color: white; border: none; border-radius: 6px; cursor: pointer;">
         🖨️ నేరుగా ప్రింట్ / PDF తీయండి (Print or Save as PDF)
     </button>
 </div>
@@ -461,7 +468,7 @@ def get_printable_letterhead_html(content: str, date_str: str, location_str: str
     <div class="content">
         {clean_content}
     </div>
-    <div style="border-top: 1px dashed #b82329; margin-top: 35px; padding-top: 12px; text-align: right; font-weight: bold; color: #444;">
+    <div style="border-top: 1px dashed #581c87; margin-top: 35px; padding-top: 12px; text-align: right; font-weight: bold; color: #444;">
         విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం
     </div>
 </div>
@@ -760,11 +767,11 @@ if st.session_state.get("is_finalized", False):
         banner_img_html = f'<img src="data:image/png;base64,{lh_banner_base64}" class="letterhead-banner-img" alt="Official Letterhead">'
     else:
         banner_img_html = """
-        <div style="border-bottom: 2px solid #b82329; padding-bottom: 12px; margin-bottom: 20px;">
+        <div style="border-bottom: 2px solid #581c87; padding-bottom: 12px; margin-bottom: 20px;">
             <table style="width: 100%;">
                 <tr>
                     <td style="width: 40%; vertical-align: top;">
-                        <h2 style="color: #b82329; margin: 0; font-size: 22px; font-weight: 800;">TATA MADHUSUDHAN</h2>
+                        <h2 style="color: #581c87; margin: 0; font-size: 22px; font-weight: 800;">TATA MADHUSUDHAN</h2>
                         <div style="font-size: 15px; font-weight: bold;">M.L.C</div>
                         <div style="font-size: 13px; color: #555;">Khammam, Telangana</div>
                     </td>
@@ -797,7 +804,7 @@ if st.session_state.get("is_finalized", False):
 <div style="line-height: 1.95; font-size: 18px;">
 {formatted_body}
 </div>
-<div style="border-top: 1.5px dashed #b82329; margin-top: 30px; padding-top: 14px; text-align: right; font-size: 15px; font-weight: 700; color: #374151;">
+<div style="border-top: 1.5px dashed #581c87; margin-top: 30px; padding-top: 14px; text-align: right; font-size: 15px; font-weight: 700; color: #374151;">
 విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం
 </div>
 </div>"""
@@ -879,13 +886,13 @@ if st.session_state.get("is_finalized", False):
 
 # Footer Developer Attribution
 st.markdown("---")
-dev_footer_img = f'<img src="data:image/jpeg;base64,{dev_image_base64}" style="width: 36px; height: 36px; border-radius: 50%; vertical-align: middle; margin-right: 10px; border: 1.5px solid #be123c;">' if dev_image_base64 else '👨‍💻 '
+dev_footer_img = f'<img src="data:image/jpeg;base64,{dev_image_base64}" style="width: 36px; height: 36px; border-radius: 50%; vertical-align: middle; margin-right: 10px; border: 1.5px solid #7e22ce;">' if dev_image_base64 else '👨‍💻 '
 st.markdown(
     f"""
     <div style="text-align: center; color: #374151; font-size: 14px; padding: 18px 0;">
         {dev_footer_img}
         <strong>Designed & Developed by Sumanth Muthamala</strong> &nbsp;|&nbsp; 
-        <span style="color: #be123c; font-weight: 600;">Revenue Inspector & PA to MLC Khammam</span>
+        <span style="color: #6b21a8; font-weight: 600;">Revenue Inspector & PA to MLC Khammam</span>
     </div>
     """, 
     unsafe_allow_html=True
