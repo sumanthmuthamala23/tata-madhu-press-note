@@ -265,8 +265,7 @@ SYSTEM_INSTRUCTION = (
     "STRICT CONSTRAINTS:\n"
     "1. LEADER EXCLUSIVITY: Every statement, critique, demand, condolence, or declaration must be strictly attributed "
     "to MLC Tata Madhusudhan (శాసనమండలి సభ్యులు తాతా మధుసూదన్ / తాతా మధు). Under no circumstances generate releases for anyone else.\n"
-    "2. VIDEO / AUDIO / NOTES HANDLING: When notes, condolences, audio, or video are provided, capture the exact core message, "
-    "facts, sentiments, condolences, or political demands immediately and accurately.\n"
+    "2. ACCURACY: Capture the exact core message, names, condolences, political context, or demands immediately and accurately.\n"
     "3. NO JURISDICTION BOUNDARIES: He speaks on statewide governance, legislative council debates, Hyderabad affairs, national topics, and grassroots public grievances.\n"
     "4. JOURNALISTIC TELUGU: Write in standard high-register journalistic Telugu (ప్రామాణిక పత్రికా భాష) formatted for Telugu daily newspapers (Eenadu, Sakshi, Namasthe Telangana, Andhra Jyothy, etc.).\n"
     "5. STRUCTURE:\n"
@@ -305,18 +304,18 @@ def google_transliterate_telugu(text: str) -> str:
             converted_words.append(word)
     return " ".join(converted_words)
 
-# Ultra-Fast Zero-Lag Generation Engine (Verified active endpoints only)
+# High-Speed Production AI Engine
 def generate_ai_response(keys: list, contents_list: list, system_instruction=SYSTEM_INSTRUCTION, temperature=0.3):
     last_error = None
     # Verified active low-latency models for google-genai SDK
-    models_to_try = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+    active_models = ["gemini-3.5-flash-lite", "gemini-3.5-flash"]
     
     for key in keys:
         if not key or not key.strip():
             continue
         try:
             client = genai.Client(api_key=key.strip())
-            for model_name in models_to_try:
+            for model_name in active_models:
                 try:
                     res = client.models.generate_content(
                         model=model_name,
@@ -718,7 +717,7 @@ if "draft_note" in st.session_state:
     with st.expander("💡 ప్రెస్ నోట్ మార్పులు (రైతుల ఆవేదన పెంచడం, వివరాలు చేర్చడం, స్పష్టత ఇవ్వడం)", expanded=False):
         ai_remark = st.text_input(
             "మీ సూచన లేదా అభ్యర్థనను ఇక్కడ రాయండి (English or Telugu):",
-            placeholder="e.g., 'రైతుల ఆవేదనను మరింత భావోద్వేగంగా మార్చండి', 'Add demand for immediate relief'..."
+            placeholder="e.g., 'సంతాప సందేశాన్ని మరింత భావోద్వేగంగా మార్చండి', 'Add emotional tribute'..."
         )
         if st.button("⚡ సూచన ఆధారంగా ప్రెస్ నోట్ తిరిగి రూపొందించండి (Re-generate with AI)", use_container_width=True):
             if ai_remark.strip():
