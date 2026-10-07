@@ -263,9 +263,9 @@ SYSTEM_INSTRUCTION = (
     "for Sri Tata Madhusudhan (Tata Madhu) Garu, Member of Legislative Council (MLC), "
     "Bharat Rashtra Samithi (BRS).\n\n"
     "STRICT CONSTRAINTS:\n"
-    "1. LEADER EXCLUSIVITY: Every statement, critique, demand, or declaration must be strictly attributed "
+    "1. LEADER EXCLUSIVITY: Every statement, critique, demand, condolence, or declaration must be strictly attributed "
     "to MLC Tata Madhusudhan (శాసనమండలి సభ్యులు తాతా మధుసూదన్ / తాతా మధు). Under no circumstances generate releases for anyone else.\n"
-    "2. VIDEO / AUDIO / NOTES HANDLING: When notes, audio, or video are provided, capture the exact core message, "
+    "2. VIDEO / AUDIO / NOTES HANDLING: When notes, condolences, audio, or video are provided, capture the exact core message, "
     "facts, sentiments, condolences, or political demands immediately and accurately.\n"
     "3. NO JURISDICTION BOUNDARIES: He speaks on statewide governance, legislative council debates, Hyderabad affairs, national topics, and grassroots public grievances.\n"
     "4. JOURNALISTIC TELUGU: Write in standard high-register journalistic Telugu (ప్రామాణిక పత్రికా భాష) formatted for Telugu daily newspapers (Eenadu, Sakshi, Namasthe Telangana, Andhra Jyothy, etc.).\n"
@@ -273,9 +273,9 @@ SYSTEM_INSTRUCTION = (
     "   - Header: అధికారిక పత్రికా ప్రకటన\n"
     "   - స్థలం & తేదీ\n"
     "   - ప్రధాన శీర్షిక (Impactful headline highlighting 'ఎమ్మెల్సీ తాతా మధు')\n"
-    "   - లీడ్ పేరా (Who, What, Where, When, and primary declaration)\n"
+    "   - లీడ్ పేరా (Who, What, Where, When, and primary declaration/condolence)\n"
     "   - ముఖ్యాంశాలు (3 to 5 clear bulleted points)\n"
-    "   - ముగింపు / హెచ్చరిక (Closing remarks and official endorsement)\n"
+    "   - ముగింపు (Closing remarks and official endorsement)\n"
     "   - విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం\n"
 )
 
@@ -305,18 +305,18 @@ def google_transliterate_telugu(text: str) -> str:
             converted_words.append(word)
     return " ".join(converted_words)
 
-# Ultra-Fast Zero-Lag Generation Engine
+# Ultra-Fast Zero-Lag Generation Engine (Verified active endpoints only)
 def generate_ai_response(keys: list, contents_list: list, system_instruction=SYSTEM_INSTRUCTION, temperature=0.3):
     last_error = None
-    # Prioritize sub-second response models
-    fast_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    # Verified active low-latency models for google-genai SDK
+    models_to_try = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
     
     for key in keys:
         if not key or not key.strip():
             continue
         try:
             client = genai.Client(api_key=key.strip())
-            for model_name in fast_models:
+            for model_name in models_to_try:
                 try:
                     res = client.models.generate_content(
                         model=model_name,
