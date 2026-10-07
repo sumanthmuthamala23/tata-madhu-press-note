@@ -265,8 +265,8 @@ SYSTEM_INSTRUCTION = (
     "STRICT CONSTRAINTS:\n"
     "1. LEADER EXCLUSIVITY: Every statement, critique, demand, or declaration must be strictly attributed "
     "to MLC Tata Madhusudhan (శాసనమండలి సభ్యులు తాతా మధుసూదన్ / తాతా మధు). Under no circumstances generate releases for anyone else.\n"
-    "2. VIDEO / AUDIO HANDLING: When audio or video is provided, thoroughly analyze all spoken statements, "
-    "speeches, key arguments, facts, figures, and context. Capture the full political intensity and context of his speech accurately.\n"
+    "2. VIDEO / AUDIO / NOTES HANDLING: When notes, audio, or video are provided, capture the exact core message, "
+    "facts, sentiments, condolences, or political demands immediately and accurately.\n"
     "3. NO JURISDICTION BOUNDARIES: He speaks on statewide governance, legislative council debates, Hyderabad affairs, national topics, and grassroots public grievances.\n"
     "4. JOURNALISTIC TELUGU: Write in standard high-register journalistic Telugu (ప్రామాణిక పత్రికా భాష) formatted for Telugu daily newspapers (Eenadu, Sakshi, Namasthe Telangana, Andhra Jyothy, etc.).\n"
     "5. STRUCTURE:\n"
@@ -275,7 +275,7 @@ SYSTEM_INSTRUCTION = (
     "   - ప్రధాన శీర్షిక (Impactful headline highlighting 'ఎమ్మెల్సీ తాతా మధు')\n"
     "   - లీడ్ పేరా (Who, What, Where, When, and primary declaration)\n"
     "   - ముఖ్యాంశాలు (3 to 5 clear bulleted points)\n"
-    "   - ముగింపు / హెచ్చరిక (Closing remarks and strong political warning)\n"
+    "   - ముగింపు / హెచ్చరిక (Closing remarks and official endorsement)\n"
     "   - విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం\n"
 )
 
@@ -305,53 +305,39 @@ def google_transliterate_telugu(text: str) -> str:
             converted_words.append(word)
     return " ".join(converted_words)
 
-# Resilient Multi-Key & Active Model Engine
+# Ultra-Fast Zero-Lag Generation Engine
 def generate_ai_response(keys: list, contents_list: list, system_instruction=SYSTEM_INSTRUCTION, temperature=0.3):
     last_error = None
+    # Prioritize sub-second response models
+    fast_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    
     for key in keys:
         if not key or not key.strip():
             continue
         try:
             client = genai.Client(api_key=key.strip())
-            active_models = []
-            try:
-                for m in client.models.list():
-                    name = m.name.replace("models/", "")
-                    methods = getattr(m, "supported_generation_methods", []) or []
-                    if not methods or "generateContent" in methods:
-                        active_models.append(name)
-            except Exception:
-                pass
-            
-            preferred = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-2.0-flash"]
-            pool = [m for m in preferred if m in active_models]
-            for m in active_models:
-                if m not in pool and ("flash" in m or "pro" in m):
-                    pool.append(m)
-            if not pool:
-                pool = ["gemini-2.5-flash", "gemini-3.8-flash"]
-
-            for model_name in pool:
-                for attempt in range(2):
-                    try:
-                        res = client.models.generate_content(
-                            model=model_name,
-                            contents=contents_list,
-                            config=types.GenerateContentConfig(
-                                system_instruction=system_instruction,
-                                temperature=temperature,
-                            ),
-                        )
-                        if res and res.text:
-                            return res.text
-                    except Exception as err:
-                        last_error = err
-                        time.sleep(1.2)
-                        continue
+            for model_name in fast_models:
+                try:
+                    res = client.models.generate_content(
+                        model=model_name,
+                        contents=contents_list,
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            temperature=temperature,
+                        ),
+                    )
+                    if res and res.text:
+                        return res.text
+                except Exception as model_err:
+                    last_error = model_err
+                    continue
         except Exception as client_err:
             last_error = client_err
             continue
-    raise last_error
+            
+    if last_error:
+        raise last_error
+    raise RuntimeError("API key unavailable or quota exceeded.")
 
 # DOCX Generator
 def create_docx_press_note(text: str, date_str: str, location_str: str) -> io.BytesIO:
@@ -534,6 +520,7 @@ with st.sidebar:
     )
 
     topic_scopes = [
+        "శుభాకాంక్షలు & సంతాపాలు (Greetings & Condolences)",
         "ప్రజా సమస్యలు & వినతులు (Public Grievances & Demands)",
         "ప్రభుత్వ విధానాలు / విమర్శలు (State Govt Policies / Criticisms)",
         "రైతాంగ & వ్యవసాయ సమస్యలు (Farmers & Agriculture Issues)",
@@ -543,7 +530,6 @@ with st.sidebar:
         "నిరసనలు, ధర్నాలు & పోరాటాలు (Protests & Agitations)",
         "అధికారులతో సమీక్షలు / వినతులు (Official Reviews & Representations)",
         "సేవా కార్యక్రమాలు & సంక్షేమం (Social Welfare & Charity)",
-        "శుభాకాంక్షలు & సంతాపాలు (Greetings & Condolences)",
     ]
     selected_scope = st.selectbox("ప్రకటన విభాగం / స్వభావం (Topic Scope)", topic_scopes)
 
@@ -583,14 +569,43 @@ input_parts = []
 
 input_mode = st.radio(
     "ఇన్‌పుట్ విధానం ఎంచుకోండి (Input Mode):",
-    ["📁 ఆడియో / వీడియో ఫైల్ అప్‌లోడ్ (File)", "🎤 లైవ్ రికార్డింగ్ (Mic)", "✍️ సిట్యుయేషన్ నోట్స్ (Text)"],
+    ["✍️ సిట్యుయేషన్ నోట్స్ (Text)", "📁 ఆడియో / వీడియో ఫైల్ అప్‌లోడ్ (File)", "🎤 లైవ్ రికార్డింగ్ (Mic)"],
     index=0,
     horizontal=True
 )
 
 st.write("")
 
-if input_mode == "📁 ఆడియో / వీడియో ఫైల్ అప్‌లోడ్ (File)":
+if input_mode == "✍️ సిట్యుయేషన్ నోట్స్ (Text)":
+    st.markdown("##### ఇంగ్లీష్ ➔ తెలుగు మార్పిడి (English Typing to Telugu):")
+    with st.expander("🔤 ఇంగ్లీష్/టాంగ్లీష్‌లో టైప్ చేసి తెలుగులోకి మార్చండి", expanded=False):
+        raw_eng = st.text_area(
+            "ఇంగ్లీష్ లేదా టాంగ్లీష్ (Tanglish) లో టైప్ చేయండి:",
+            placeholder="ఉదాహరణ: Rythu Bandu inka Raledu, Tata Madhu garu mandapaddaru...",
+            height=85,
+            key="raw_eng_text"
+        )
+        if st.button("🔄 తెలుగులోకి మార్చండి (Convert to Telugu)", use_container_width=True):
+            if raw_eng.strip():
+                with st.spinner("తెలుగులోకి మారుస్తోంది..."):
+                    converted = google_transliterate_telugu(raw_eng)
+                    st.session_state["final_notes_area"] = converted
+                    st.rerun()
+            else:
+                st.warning("దయచేసి ఇంగ్లీష్‌లో టెక్స్ట్ టైప్ చేయండి.")
+
+    st.markdown("##### పత్రికా ప్రకటన కోసం ముఖ్యాంశాలు (Notes):")
+    notes_text = st.text_area(
+        "తెలుగు వివరాలు (నేరుగా ఇక్కడ నమోదు చేయండి లేదా సవరించుకోండి):",
+        height=140,
+        value=st.session_state.get("final_notes_area", ""),
+        key="notes_text_area",
+        placeholder="ఇక్కడ వివరాలు రాయండి (ఉదా: సంతాప ప్రకటన, సభ వివరాలు, రైతు సమస్యలు...)"
+    )
+    if notes_text.strip():
+        input_parts.append(types.Part.from_text(text=notes_text))
+
+elif input_mode == "📁 ఆడియో / వీడియో ఫైల్ అప్‌లోడ్ (File)":
     st.markdown("##### 📁 మొబైల్ లేదా ల్యాప్‌టాప్ రికార్డింగ్ ఫైల్ ఎంచుకోండి:")
     
     col_f1, col_f2 = st.columns([3, 1])
@@ -611,7 +626,6 @@ if input_mode == "📁 ఆడియో / వీడియో ఫైల్ అప�
         f_name = uploaded_file.name
         fn_low = f_name.lower()
 
-        # Direct MIME normalization
         if fn_low.endswith((".m4a", ".aac")) or "m4a" in (uploaded_file.type or "").lower():
             clean_mime = "audio/mp4"
         elif fn_low.endswith(".mp3"):
@@ -640,34 +654,6 @@ elif input_mode == "🎤 లైవ్ రికార్డింగ్ (Mic)":
         st.success("✅ ఆడియో రికార్డ్ అయ్యింది!")
         audio_bytes = live_audio.read()
         input_parts.append(types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav"))
-
-elif input_mode == "✍️ సిట్యుయేషన్ నోట్స్ (Text)":
-    st.markdown("##### ఇంగ్లీష్ ➔ తెలుగు మార్పిడి (English Typing to Telugu):")
-    with st.expander("🔤 ఇంగ్లీష్/టాంగ్లీష్‌లో టైప్ చేసి తెలుగులోకి మార్చండి", expanded=True):
-        raw_eng = st.text_area(
-            "ఇంగ్లీష్ లేదా టాంగ్లీష్ (Tanglish) లో టైప్ చేయండి:",
-            placeholder="ఉదాహరణ: Rythu Bandu inka Raledu, Tata Madhu garu mandapaddaru...",
-            height=85,
-            key="raw_eng_text"
-        )
-        if st.button("🔄 తెలుగులోకి మార్చండి (Convert to Telugu)", use_container_width=True):
-            if raw_eng.strip():
-                with st.spinner("తెలుగులోకి మారుస్తోంది..."):
-                    converted = google_transliterate_telugu(raw_eng)
-                    st.session_state["final_notes_area"] = converted
-                    st.rerun()
-            else:
-                st.warning("దయచేసి ఇంగ్లీష్‌లో టెక్స్ట్ టైప్ చేయండి.")
-
-    st.markdown("##### పత్రికా ప్రకటన కోసం ముఖ్యాంశాలు (Notes):")
-    notes_text = st.text_area(
-        "తెలుగు వివరాలు (నేరుగా ఇక్కడ సవరించుకోవచ్చు):",
-        height=140,
-        value=st.session_state.get("final_notes_area", ""),
-        key="notes_text_area"
-    )
-    if notes_text.strip():
-        input_parts.append(types.Part.from_text(text=notes_text))
 
 st.divider()
 
@@ -698,15 +684,15 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
             input_parts.append(types.Part.from_bytes(data=fb, mime_type=fm))
 
     if not input_parts:
-        st.error("⚠️️ దయచేసి ఆడియో రికార్డ్ చేయండి, ఫైల్ అప్‌లోడ్ చేయండి లేదా నోట్స్ నమోదు చేయండి.")
+        st.error("⚠️ దయచేసి వివరాలు నమోదు చేయండి (నోట్స్, ఆడియో లేదా వీడియో).")
     else:
-        with st.spinner("ఎమ్మెల్సీ గారి అధికారిక ప్రకటన సిద్ధమవుతోంది (AI Analyzing Media)..."):
+        with st.spinner("⚡ పత్రికా ప్రకటన తక్షణమే సిద్ధమవుతోంది..."):
             try:
                 prompt_instruction = (
                     f"\nప్రకటన విభాగం / స్వభావం: {selected_scope}\n"
                     f"స్థలం: {final_location}\n"
                     f"తేదీ: {formatted_date}\n"
-                    "దయచేసి అందించిన ఆడియో/వీడియో/నోట్స్ ఆధారంగా "
+                    "దయచేసి అందించిన సమాచారం ఆధారంగా "
                     "ఎమ్మెల్సీ తాతా మధుసూదన్ గారి అధికారిక పత్రికా ప్రకటనను రూపొందించండి.\n"
                 )
                 parts_with_prompt = input_parts + [prompt_instruction]
@@ -715,11 +701,11 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
                 st.session_state["final_note"] = press_note_telugu
                 st.session_state["is_finalized"] = False
             except Exception as e:
-                st.error(f"సర్వర్ బిజీగా ఉంది, దయచేసి మరోసారి ప్రయత్నించండి: {str(e)}")
+                st.error(f"సర్వర్ లోపం: {str(e)}")
 
 # Display, Edit & AI Suggestion Refinement Section
 if "draft_note" in st.session_state:
-    st.subheader("✏️️ ఎడిట్ & AI సలహాలు (Edit & AI Remarks)")
+    st.subheader("✏️ ఎడిట్ & AI సలహాలు (Edit & AI Remarks)")
     
     edited_note = st.text_area(
         "ముసాయిదాను ఇక్కడ పరిశీలించి నేరుగా సవరించవచ్చు:",
@@ -729,7 +715,7 @@ if "draft_note" in st.session_state:
     )
     
     st.markdown("##### 🤖 జెమినీ AI సలహా / మోడ్ మార్పు (AI Tone & Situation Re-generator):")
-    with st.expander("💡 ప్రెస్ నోట్ మార్పులు (రైతుల ఆవేదన పెంచడం, వివరాలు చేర్చడం, స్పష్టత ఇవ్వడం)", expanded=True):
+    with st.expander("💡 ప్రెస్ నోట్ మార్పులు (రైతుల ఆవేదన పెంచడం, వివరాలు చేర్చడం, స్పష్టత ఇవ్వడం)", expanded=False):
         ai_remark = st.text_input(
             "మీ సూచన లేదా అభ్యర్థనను ఇక్కడ రాయండి (English or Telugu):",
             placeholder="e.g., 'రైతుల ఆవేదనను మరింత భావోద్వేగంగా మార్చండి', 'Add demand for immediate relief'..."
