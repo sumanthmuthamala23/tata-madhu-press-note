@@ -7,6 +7,7 @@ import tempfile
 import datetime
 import urllib.parse
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image
 from docx import Document
 from docx.shared import Pt, RGBColor
@@ -16,7 +17,7 @@ from google.genai import types
 
 # Page setup
 st.set_page_config(
-    page_title="MLC తాతా మధు - అధికారిక పత్రికా ప్రకటన & సందేశాల కన్సోల్",
+    page_title="MLC తాతా మధు - AI ప్రెస్ నోట్ & సందేశాల కన్సోల్",
     page_icon="📰",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -44,10 +45,37 @@ def get_cropped_letterhead_banner(image_path):
             return get_base64_image(image_path)
     return None
 
+# JavaScript 1-Click Clipboard Copy Component
+def render_copy_button(text_to_copy, button_label="📋 క్లిక్‌తో కాపీ చేయండి (Copy to Clipboard)", element_id="copy_btn"):
+    safe_text = json.dumps(text_to_copy)
+    html_code = f"""
+    <div style="margin: 8px 0;">
+        <button id="{element_id}" onclick="copyText_{element_id}()" 
+            style="background: linear-gradient(90deg, #4c1d95 0%, #7e22ce 100%);
+                   color: white; border: none; padding: 10px 18px; border-radius: 8px;
+                   font-size: 14px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+            {button_label}
+        </button>
+        <span id="msg_{element_id}" style="color: #15803d; font-weight: bold; margin-left: 12px; display: none;">✅ క్లిప్‌బోర్డ్‌కి కాపీ అయ్యింది!</span>
+    </div>
+    <script>
+    function copyText_{element_id}() {{
+        const text = {safe_text};
+        navigator.clipboard.writeText(text).then(() => {{
+            const msg = document.getElementById("msg_{element_id}");
+            msg.style.display = "inline";
+            setTimeout(() => {{ msg.style.display = "none"; }}, 2500);
+        }}).catch(err => {{
+            console.error('Could not copy text: ', err);
+        }});
+    }}
+    </script>
+    """
+    components.html(html_code, height=52)
+
 bg_image_base64 = get_base64_image("background.png")
 dev_image_base64 = get_base64_image("Sumanth.jpg") or get_base64_image("sumanth.jpg")
 
-# Locate letterhead file
 lh_filename = None
 for fname in ["letterhead.png", "letter head(2).jpg", "letterhead.jpg"]:
     if os.path.exists(fname):
@@ -75,7 +103,6 @@ else:
     }
     """
 
-# Custom CSS: Royal Imperial Violet Theme
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@300;400;500;600;700;800&display=swap');
@@ -122,15 +149,6 @@ st.markdown(f"""
         font-weight: 500 !important;
     }}
 
-    .config-card {{
-        background: #ffffff;
-        border: 1.5px solid #e9d5ff;
-        border-radius: 12px;
-        padding: 16px 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 10px rgba(88, 28, 135, 0.04);
-    }}
-
     .stTextInput>div>div>input, .stTextArea>div>div>textarea {{
         background-color: #ffffff !important;
         color: #0f172a !important;
@@ -153,10 +171,6 @@ st.markdown(f"""
         padding: 12px 24px !important;
         box-shadow: 0 4px 14px rgba(126, 34, 206, 0.35) !important;
         transition: all 0.2s ease !important;
-    }}
-    div.stButton > button[kind="primary"]:hover {{
-        transform: translateY(-1px);
-        box-shadow: 0 6px 18px rgba(126, 34, 206, 0.5) !important;
     }}
 
     .letterhead-container {{
@@ -226,7 +240,8 @@ SYSTEM_INSTRUCTION_BASE = (
     "STRICT CONSTRAINTS:\n"
     "1. LEADER EXCLUSIVITY: Every statement, message, meeting invite, critique, or declaration must be strictly attributed "
     "to MLC Tata Madhusudhan (శాసనమండలి సభ్యులు తాతా మధుసూదన్ / తాతా మధు). Under no circumstances generate messages for anyone else.\n"
-    "2. ACCURACY: Capture the exact core message, venue, time, context, and political mobilization details.\n"
+    "2. SITUATIONAL COMPREHENSION: Whether the user input is in English, Telugu, Tanglish, or bullet points, synthesize it into "
+    "authentic, authoritative, standard journalistic & political Telugu.\n"
     "3. JOURNALISTIC & OFFICIAL TELUGU: Write in dignified, authentic, culturally grounded Telugu.\n"
 )
 
@@ -254,8 +269,8 @@ SYSTEM_INSTRUCTION_SHORT = SYSTEM_INSTRUCTION_BASE + (
 )
 
 SYSTEM_INSTRUCTION_MESSAGES = SYSTEM_INSTRUCTION_BASE + (
-    "\nTASK: GENERATE 3 DEDICATED SITUATIONAL & MEETING MESSAGES BASED ON THE INPUT:\n"
-    "You must return the response formatted EXACTLY with these 3 sections separated by specific tags:\n\n"
+    "\nTASK: GENERATE 3 DEDICATED SITUATIONAL & MEETING MESSAGES BASED ON THE INPUT PROMPT:\n"
+    "Return the response formatted EXACTLY with these 3 sections separated by specific tags:\n\n"
     "===LEADERS_MSG===\n"
     "(Formal, dignified, authoritative invite/message addressed to BRS District Leaders, Public Representatives, ZPTCs, MPTCs, and senior party functionaries. Mention date, time, venue, agenda importance, and request mandatory attendance).\n\n"
     "===CADRE_MSG===\n"
@@ -290,7 +305,7 @@ def google_transliterate_telugu(text: str) -> str:
             converted_words.append(word)
     return " ".join(converted_words)
 
-# High-Speed Production AI Engine
+# High-Speed AI Engine
 def generate_ai_response(keys: list, contents_list: list, system_instruction: str, temperature=0.3):
     last_error = None
     active_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash"]
@@ -446,7 +461,7 @@ def get_printable_letterhead_html(content: str, date_str: str, location_str: str
 </body>
 </html>"""
 
-# ----------------- SIDEBAR (API KEY & DEVELOPER INFO ONLY) -----------------
+# ----------------- SIDEBAR -----------------
 with st.sidebar:
     st.markdown("### సెట్టింగ్స్ (Settings)")
     default_key = ""
@@ -481,10 +496,10 @@ active_keys = [api_key_input]
 if backup_key and backup_key != api_key_input:
     active_keys.append(backup_key)
 
-# ----------------- MAIN UI (ALL CONTROLS IN MAIN CONSOLE) -----------------
+# ----------------- MAIN UI -----------------
 st.markdown(f"""
 <div class="header-card">
-    <h1>🎙️ ఎమ్మెల్సీ తాతా మధుసూదన్ — అధికారిక కమ్యూనికేషన్ కన్సోల్</h1>
+    <h1>🎙️ ఎమ్మెల్సీ తాతా మధుసూదన్ — AI ప్రెస్ నోట్ & సందేశాల కన్సోల్</h1>
     <p>శాసనమండలి మీడియా సమన్వయ విభాగం & పార్టీ కమ్యూనికేషన్స్ | BRS Party</p>
 </div>
 """, unsafe_allow_html=True)
@@ -493,7 +508,7 @@ if not api_key_input:
     st.warning("ముందుగా సైడ్‌బార్‌లో మీ Gemini API Keyని నమోదు చేయండి.")
     st.stop()
 
-# ----------------- MAIN CONSOLE CONFIGURATION BAR -----------------
+# Main Console Configuration Bar
 with st.container():
     col_c1, col_c2, col_c3 = st.columns([1, 1.4, 1.6])
     
@@ -541,8 +556,8 @@ with st.container():
 
 st.divider()
 
-# Communication Category Selector: Press Note vs Meeting/Cadre Messages
-col_cat1, col_cat2 = st.columns([1.2, 1])
+# Communication Category Selector
+col_cat1, col_cat2 = st.columns([1.3, 1])
 
 with col_cat1:
     comm_mode = st.radio(
@@ -563,10 +578,10 @@ with col_cat2:
             horizontal=True
         )
 
-# Media Input Selector
+# Media & Prompt Input Selector
 input_mode = st.radio(
     "📥 ఇన్‌పుట్ విధానం (Input Mode):",
-    ["✍️ సిట్యుయేషన్ నోట్స్ (Text)", "📁 ఆడియో / వీడియో ఫైల్ (File)", "🎤 లైవ్ రికార్డింగ్ (Mic)"],
+    ["✍️ సిట్యుయేషన్ నోట్స్ / ప్రాంప్ట్ (Situational Text Prompt)", "📁 ఆడియో / వీడియో ఫైల్ (File)", "🎤 లైవ్ రికార్డింగ్ (Mic)"],
     index=0,
     horizontal=True
 )
@@ -578,31 +593,14 @@ if "audio_file_payload" not in st.session_state:
 
 input_parts = []
 
-if input_mode == "✍️ సిట్యుయేషన్ నోట్స్ (Text)":
-    st.markdown("##### ఇంగ్లీష్ ➔ తెలుగు మార్పిడి (English Typing to Telugu):")
-    with st.expander("🔤 ఇంగ్లీష్/టాంగ్లీష్‌లో టైప్ చేసి తెలుగులోకి మార్చండి", expanded=False):
-        raw_eng = st.text_area(
-            "ఇంగ్లీష్ లేదా టాంగ్లీష్ (Tanglish) లో టైప్ చేయండి:",
-            placeholder="ఉదాహరణ: Telangana Bhavan lo meeting undi, leaders andaru attend kavali...",
-            height=85,
-            key="raw_eng_text"
-        )
-        if st.button("🔄 తెలుగులోకి మార్చండి (Convert to Telugu)", use_container_width=True):
-            if raw_eng.strip():
-                with st.spinner("తెలుగులోకి మారుస్తోంది..."):
-                    converted = google_transliterate_telugu(raw_eng)
-                    st.session_state["final_notes_area"] = converted
-                    st.rerun()
-            else:
-                st.warning("దయచేసి ఇంగ్లీష్‌లో టెక్స్ట్ టైప్ చేయండి.")
-
-    st.markdown("##### సందర్భం / ఎజెండా ముఖ్య వివరాలు (Agenda / Situation Details):")
+if input_mode == "✍️ సిట్యుయేషన్ నోట్స్ / ప్రాంప్ట్ (Situational Text Prompt)":
+    st.markdown("##### 🤖 సిట్యుయేషన్ ప్రాంప్ట్ / వివరాలు (Enter Situation Prompt in English, Tanglish, or Telugu):")
     notes_text = st.text_area(
-        "తెలుగు వివరాలు (నేరుగా ఇక్కడ నమోదు చేయండి లేదా సవరించుకోండి):",
-        height=130,
+        "ఇక్కడ మీ ప్రాంప్ట్ లేదా నోట్స్ నమోదు చేయండి (English / Telugu / Tanglish):",
+        height=135,
         value=st.session_state.get("final_notes_area", ""),
         key="notes_text_area",
-        placeholder="సమావేశ ఎజెండా, ప్రాముఖ్యత లేదా సందర్భాన్ని ఇక్కడ రాయండి..."
+        placeholder="ఉదాహరణ: రేపు ఉదయం 10 గంటలకు తెలంగాణ భవన్‌లో రైతు రుణమాఫీపై నియోజకవర్గ ముఖ్య నేతల అత్యవసర సమావేశం, అందరూ హాజరు కావాలి..."
     )
     if notes_text.strip():
         input_parts.append(types.Part.from_text(text=notes_text))
@@ -685,9 +683,9 @@ if st.button(btn_label, type="primary", use_container_width=True):
             input_parts.append(types.Part.from_bytes(data=fb, mime_type=fm))
 
     if not input_parts:
-        st.error("⚠️ దయచేసి వివరాలు నమోదు చేయండి (నోట్స్, ఆడియో లేదా వీడియో).")
+        st.error("⚠️ దయచేసి వివరాలు లేదా ప్రాంప్ట్ నమోదు చేయండి.")
     else:
-        with st.spinner("⚡ సందేశాలు / పత్రికా ప్రకటన సిద్ధమవుతోంది..."):
+        with st.spinner("⚡ AI రూపొందిస్తోంది... దయచేసి వేచి ఉండండి..."):
             try:
                 if "సందేశాలు" in comm_mode:
                     prompt_instruction = (
@@ -727,15 +725,13 @@ if st.button(btn_label, type="primary", use_container_width=True):
                 st.error(f"సర్వర్ లోపం: {str(e)}")
 
 # =========================================================================
-# OUTPUT VIEW: DEDICATED MEETING MESSAGES (LEADERS, CADRE & PRESS SLOTS)
+# OUTPUT VIEW: DEDICATED MEETING & SITUATIONAL MESSAGES (3 SLOTS)
 # =========================================================================
 if st.session_state.get("is_message_mode", False) and "messages_output" in st.session_state:
     st.divider()
     st.subheader("📢 ఎమ్మెల్సీ తాతా మధు గారి అధికారిక సమావేశ సందేశాలు (3 Dedicated Slots)")
     
     raw_msgs = st.session_state["messages_output"]
-    
-    # Parse the 3 parts safely
     leaders_text = ""
     cadre_text = ""
     press_text = ""
@@ -760,29 +756,73 @@ if st.session_state.get("is_message_mode", False) and "messages_output" in st.se
     tab_m1, tab_m2, tab_m3 = st.tabs([
         "👥 ముఖ్య నాయకులకు (BRS Leaders)", 
         "✊ పార్టీ శ్రేణులు & కార్యకర్తలకు (Cadre & Followers)", 
-        "🎙️ మీడియా & పత్రికా ప్రతినిధులకు (Press Invite)"
+        "🎙️ మీడియా & పత్రికా ప్రతినిధులకు (Press Slot)"
     ])
 
     with tab_m1:
         st.markdown("##### 📌 ముఖ్య నాయకులు, ప్రజాప్రతినిధులకు సందేశం:")
-        edited_leader = st.text_area("సందేశం సవరించుకోండి (Edit):", value=leaders_text, height=220, key="edit_leader_msg")
-        wa_url_leader = f"https://api.whatsapp.com/send?text={urllib.parse.quote(edited_leader)}"
-        st.link_button("📲 నాయకులకు వాట్సాప్‌లో పంపండి (Send to Leaders)", wa_url_leader, use_container_width=True)
+        edited_leader = st.text_area("సందేశం పరిశీలించండి / సవరించండి:", value=leaders_text, height=200, key="edit_leader_msg")
+        render_copy_button(edited_leader, "📋 నాయకుల సందేశాన్ని కాపీ చేయండి (Copy Text)", "btn_copy_leader")
+        
+        st.markdown("**సోషల్ మీడియా / మెసేజింగ్ షేరింగ్:**")
+        col_s1, col_s2, col_s3 = st.columns(3)
+        with col_s1:
+            wa_lead = f"https://api.whatsapp.com/send?text={urllib.parse.quote(edited_leader)}"
+            st.link_button("📲 WhatsApp లో పంపండి", wa_lead, use_container_width=True)
+        with col_s2:
+            tg_lead = f"https://t.me/share/url?url=&text={urllib.parse.quote(edited_leader)}"
+            st.link_button("✈️ Telegram లో పంపండి", tg_lead, use_container_width=True)
+        with col_s3:
+            tw_lead = f"https://twitter.com/intent/tweet?text={urllib.parse.quote(edited_leader[:250])}"
+            st.link_button("🐦 X (Twitter) లో పోస్ట్ చేయండి", tw_lead, use_container_width=True)
 
     with tab_m2:
-        st.markdown("##### 📌 గ్రామ, మండల స్థాయి పార్టీ శ్రేణులు, యువజన విభాగానికి సందేశం:")
-        edited_cadre = st.text_area("సందేశం సవరించుకోండి (Edit):", value=cadre_text, height=220, key="edit_cadre_msg")
-        wa_url_cadre = f"https://api.whatsapp.com/send?text={urllib.parse.quote(edited_cadre)}"
-        st.link_button("📲 శ్రేణులకు వాట్సాప్‌లో పంపండి (Mobilize Cadre)", wa_url_cadre, use_container_width=True)
+        st.markdown("##### 📌 పార్టీ శ్రేణులు, కార్యకర్తలు & యూత్ విభాగానికి పిలుపు:")
+        edited_cadre = st.text_area("సందేశం పరిశీలించండి / సవరించండి:", value=cadre_text, height=200, key="edit_cadre_msg")
+        render_copy_button(edited_cadre, "📋 కార్యకర్తల సందేశాన్ని కాపీ చేయండి (Copy Text)", "btn_copy_cadre")
+        
+        st.markdown("**సోషల్ మీడియా / మెసేజింగ్ షేరింగ్:**")
+        col_c1, col_c2, col_c3 = st.columns(3)
+        with col_c1:
+            wa_cad = f"https://api.whatsapp.com/send?text={urllib.parse.quote(edited_cadre)}"
+            st.link_button("📲 WhatsApp లో పంపండి", wa_cad, use_container_width=True)
+        with col_c2:
+            tg_cad = f"https://t.me/share/url?url=&text={urllib.parse.quote(edited_cadre)}"
+            st.link_button("✈️ Telegram లో పంపండి", tg_cad, use_container_width=True)
+        with col_c3:
+            fb_cad = f"https://www.facebook.com/sharer/sharer.php?u=&quote={urllib.parse.quote(edited_cadre)}"
+            st.link_button("🔷 Facebook లో పోస్ట్ చేయండి", fb_cad, use_container_width=True)
 
     with tab_m3:
-        st.markdown("##### 📌 ప్రింట్ & ఎలక్ట్రానిక్ మీడియా ప్రతినిధులకు అధికారిక ఆహ్వానం:")
-        edited_press = st.text_area("ఆహ్వానం సవరించుకోండి (Edit):", value=press_text, height=220, key="edit_press_msg")
-        wa_url_press = f"https://api.whatsapp.com/send?text={urllib.parse.quote(edited_press)}"
-        st.link_button("📲 మీడియా ప్రతినిధులకు ఆహ్వానం పంపండి (Invite Press)", wa_url_press, use_container_width=True)
+        st.markdown("##### 📌 ప్రింట్, ఎలక్ట్రానిక్ & డిజిటల్ మీడియా ప్రతినిధులకు ఆహ్వానం / నోట్:")
+        edited_press = st.text_area("మీడియా నోట్ పరిశీలించండి / సవరించండి:", value=press_text, height=200, key="edit_press_msg")
+        
+        col_pr_act1, col_pr_act2 = st.columns(2)
+        with col_pr_act1:
+            render_copy_button(edited_press, "📋 మీడియా సందేశాన్ని కాపీ చేయండి (Copy Text)", "btn_copy_press")
+        with col_pr_act2:
+            if st.button("📄 లెటర్‌హెడ్‌పై ప్రెస్ నోట్‌గా మార్చండి (View on Letterhead)", use_container_width=True):
+                st.session_state["draft_note"] = edited_press
+                st.session_state["final_note"] = edited_press
+                st.session_state["is_short_selected"] = True
+                st.session_state["is_message_mode"] = False
+                st.session_state["is_finalized"] = True
+                st.rerun()
+
+        st.markdown("**సోషల్ మీడియా / మెసేజింగ్ షేరింగ్:**")
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1:
+            wa_prs = f"https://api.whatsapp.com/send?text={urllib.parse.quote(edited_press)}"
+            st.link_button("📲 WhatsApp లో పంపండి", wa_prs, use_container_width=True)
+        with col_p2:
+            tw_prs = f"https://twitter.com/intent/tweet?text={urllib.parse.quote(edited_press[:250])}"
+            st.link_button("🐦 X (Twitter) లో షేర్ చేయండి", tw_prs, use_container_width=True)
+        with col_p3:
+            tg_prs = f"https://t.me/share/url?url=&text={urllib.parse.quote(edited_press)}"
+            st.link_button("✈️ Telegram లో షేర్ చేయండి", tg_prs, use_container_width=True)
 
 # =========================================================================
-# OUTPUT VIEW: OFFICIAL PRESS NOTE (ON OFFICIAL LETTERHEAD)
+# OUTPUT VIEW: OFFICIAL PRESS NOTE (ON OFFICIAL LETTERHEAD CANVAS)
 # =========================================================================
 elif not st.session_state.get("is_message_mode", False) and "draft_note" in st.session_state:
     st.subheader("✏️ ఎడిట్ & AI సలహాలు (Edit & AI Remarks)")
@@ -842,11 +882,12 @@ if st.session_state.get("is_finalized", False) and not st.session_state.get("is_
             break
 
     st.divider()
-    st.markdown("### 📄 Google Docs & డాక్యుమెంట్ ఎగుమతి")
+    st.markdown("### 📋 ప్రెస్ నోట్ కాపీ & ఎగుమతి (Copy & Export)")
+    
+    render_copy_button(final_content, "📋 పూర్తి ప్రెస్ నోట్ కాపీ చేయండి (Copy Full Press Note)", "btn_copy_final_press")
     
     col_exp1, col_exp2 = st.columns([1, 1])
     with col_exp1:
-        st.info("💡 **Google Docs లోకి నేరుగా:** Word File (.DOCX) ఫైల్‌ను డౌన్‌లోడ్ చేసి Google Drive / Docs లో తెరిస్తే హెడర్, లెటర్‌హెడ్ మరియు తేదీలతో సహా వస్తుంది.")
         docx_data = create_docx_press_note(final_content, formatted_date, final_location, is_short)
         st.download_button(
             label="📄 Word File (.DOCX) డౌన్‌లోడ్ చేయండి",
@@ -855,10 +896,15 @@ if st.session_state.get("is_finalized", False) and not st.session_state.get("is_
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True
         )
-
     with col_exp2:
-        st.info("📋 **Google Doc లో పేస్ట్ చేయడానికి:** కింది బటన్ ద్వారా ప్రెస్ నోట్ మొత్తాన్ని కాపీ చేసి మీ Google Doc లో Ctrl+V పేస్ట్ చేసుకోవచ్చు.")
-        st.text_area("పూర్తి టెక్స్ట్ (Copy all):", value=final_content, height=100)
+        html_page = get_printable_letterhead_html(final_content, formatted_date, final_location, lh_banner_base64)
+        st.download_button(
+            label="🖨️ PDF / Print File (.HTML) డౌన్‌లోడ్ చేయండి",
+            data=html_page,
+            file_name=f"Tata_Madhu_Letterhead_{formatted_date}.html",
+            mime="text/html",
+            use_container_width=True
+        )
 
     st.write("")
     st.subheader("📄 అధికారిక లెటర్‌హెడ్ వీక్షణ (Official Letterhead View)")
@@ -912,27 +958,37 @@ if st.session_state.get("is_finalized", False) and not st.session_state.get("is_
     st.markdown(canvas_html, unsafe_allow_html=True)
     
     st.write("")
-    col_d1, col_d2 = st.columns(2)
-    with col_d1:
-        html_page = get_printable_letterhead_html(final_content, formatted_date, final_location, lh_banner_base64)
-        st.download_button(
-            label="🖨️ PDF / Print File (.HTML)",
-            data=html_page,
-            file_name=f"Tata_Madhu_Letterhead_{formatted_date}.html",
-            mime="text/html",
-            use_container_width=True,
-            help="ఓపెన్ చేసి Print -> Save as PDF ఎంచుకోండి."
-        )
-    with col_d2:
-        st.download_button(
-            label="📥 Text File (.TXT)",
-            data=final_content,
-            file_name=f"Tata_Madhu_PressNote_{formatted_date}.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
+    st.subheader("🌐 సోషల్ మీడియా పోస్టులు (Ready to Share & Post)")
+    summary_body = "\n".join(lines[1:5]) if len(lines) > 1 else final_content
 
-# Footer Developer Attribution
+    whatsapp_text = f"*{headline}*\n\n{final_content}\n\n_విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం_"
+    twitter_text = f"🚨 {headline[:180]}\n\n- ఎమ్మెల్సీ తాతా మధుసూదన్\n\n#TataMadhu #BRSParty #Telangana #Khammam"
+    facebook_text = f"📌 {headline}\n\n{final_content}\n\n#TataMadhusudhan #TataMadhu #BRS #Khammam #TelanganaPolitics"
+    telegram_text = f"📢 *{headline}*\n\n{final_content}"
+
+    st1, st2, st3, st4 = st.tabs(["🟢 WhatsApp", "🔵 Twitter (X)", "🔷 Facebook", "✈️ Telegram"])
+    with st1:
+        st.text_area("WhatsApp Text:", value=whatsapp_text, height=160)
+        render_copy_button(whatsapp_text, "📋 WhatsApp టెక్స్ట్ కాపీ చేయండి", "copy_wa")
+        wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(whatsapp_text[:1400])}"
+        st.link_button("📲 వాట్సాప్‌లో షేర్ చేయండి", wa_url, use_container_width=True)
+    with st2:
+        st.text_area("Twitter (X) Post:", value=twitter_text, height=130)
+        render_copy_button(twitter_text, "📋 X (Twitter) పోస్ట్ కాపీ చేయండి", "copy_tw")
+        x_url = f"https://twitter.com/intent/tweet?text={urllib.parse.quote(twitter_text)}"
+        st.link_button("🐦 X (Twitter) లో పోస్ట్ చేయండి", x_url, use_container_width=True)
+    with st3:
+        st.text_area("Facebook Post:", value=facebook_text, height=160)
+        render_copy_button(facebook_text, "📋 Facebook పోస్ట్ కాపీ చేయండి", "copy_fb")
+        fb_url = f"https://www.facebook.com/sharer/sharer.php?u=&quote={urllib.parse.quote(facebook_text[:1000])}"
+        st.link_button("🔷 Facebook లో పోస్ట్ చేయండి", fb_url, use_container_width=True)
+    with st4:
+        st.text_area("Telegram Post:", value=telegram_text, height=160)
+        render_copy_button(telegram_text, "📋 Telegram టెక్స్ట్ కాపీ చేయండి", "copy_tg")
+        tg_url = f"https://t.me/share/url?url=&text={urllib.parse.quote(telegram_text[:1400])}"
+        st.link_button("✈️ Telegram లో షేర్ చేయండి", tg_url, use_container_width=True)
+
+# Footer
 st.markdown("---")
 dev_footer_img = f'<img src="data:image/jpeg;base64,{dev_image_base64}" style="width: 36px; height: 36px; border-radius: 50%; vertical-align: middle; margin-right: 10px; border: 1.5px solid #7e22ce;">' if dev_image_base64 else '👨‍💻 '
 st.markdown(
