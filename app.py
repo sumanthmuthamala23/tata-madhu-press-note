@@ -16,7 +16,7 @@ from google.genai import types
 
 # Page setup
 st.set_page_config(
-    page_title="MLC తాతా మధు - అధికారిక పత్రికా ప్రకటన కన్సోల్",
+    page_title="MLC తాతా మధు - అధికారిక పత్రికా ప్రకటన & సందేశాల కన్సోల్",
     page_icon="📰",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -218,27 +218,27 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------- SYSTEM INSTRUCTIONS (SHORT VS LONG) -----------------
+# ----------------- SYSTEM INSTRUCTIONS -----------------
 SYSTEM_INSTRUCTION_BASE = (
-    "You are the EXCLUSIVE Chief Media Secretary & Official Telugu Press Spokesperson "
+    "You are the EXCLUSIVE Chief Media Secretary & Political Communication Director "
     "for Sri Tata Madhusudhan (Tata Madhu) Garu, Member of Legislative Council (MLC), "
     "Bharat Rashtra Samithi (BRS).\n\n"
     "STRICT CONSTRAINTS:\n"
-    "1. LEADER EXCLUSIVITY: Every statement, critique, demand, condolence, or declaration must be strictly attributed "
-    "to MLC Tata Madhusudhan (శాసనమండలి సభ్యులు తాతా మధుసూదన్ / తాతా మధు). Under no circumstances generate releases for anyone else.\n"
-    "2. ACCURACY: Capture the exact core message, names, facts, condolences, political context, or demands accurately.\n"
-    "3. JOURNALISTIC TELUGU: Write in standard high-register journalistic Telugu (ప్రామాణిక పత్రికా భాష) formatted for major Telugu daily newspapers (Eenadu, Sakshi, Namasthe Telangana, Andhra Jyothy, etc.).\n"
+    "1. LEADER EXCLUSIVITY: Every statement, message, meeting invite, critique, or declaration must be strictly attributed "
+    "to MLC Tata Madhusudhan (శాసనమండలి సభ్యులు తాతా మధుసూదన్ / తాతా మధు). Under no circumstances generate messages for anyone else.\n"
+    "2. ACCURACY: Capture the exact core message, venue, time, context, and political mobilization details.\n"
+    "3. JOURNALISTIC & OFFICIAL TELUGU: Write in dignified, authentic, culturally grounded Telugu.\n"
 )
 
 SYSTEM_INSTRUCTION_LONG = SYSTEM_INSTRUCTION_BASE + (
     "\nFORMAT: COMPREHENSIVE OFFICIAL PRESS NOTE (సమగ్ర అధికారిక పత్రికా ప్రకటన)\n"
     "- Header: అధికారిక పత్రికా ప్రకటన\n"
     "- స్థలం & తేదీ (Dateline format)\n"
-    "- ప్రధాన శీర్షిక (A powerful 1-2 line bold headline highlighting 'ఎమ్మెల్సీ తాతా మధు')\n"
-    "- లీడ్ పేరా (Complete background, venue, core political message or heartfelt condolence)\n"
+    "- ప్రధాన శీర్షిక (Impactful bold headline highlighting 'ఎమ్మెల్సీ తాతా మధు')\n"
+    "- లీడ్ పేరా (Complete background, venue, core political punch and primary statement)\n"
     "- సమగ్ర వివరాలు (2 rich descriptive paragraphs with facts, political context, and arguments)\n"
     "- ముఖ్యాంశాలు (4 to 6 strong bullet points summarizing key critiques or demands)\n"
-    "- ముగింపు (Closing remarks and official endorsement)\n"
+    "- ముగింపు (Closing political resolution, warning to opposition, or sincere tribute)\n"
     "- విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం\n"
 )
 
@@ -251,6 +251,17 @@ SYSTEM_INSTRUCTION_SHORT = SYSTEM_INSTRUCTION_BASE + (
     "- ముఖ్యాంశాలు (3 crisp, high-impact bullet points)\n"
     "- ముగింపు ప్రకటన (1 final crisp closing sentence)\n"
     "- విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం\n"
+)
+
+SYSTEM_INSTRUCTION_MESSAGES = SYSTEM_INSTRUCTION_BASE + (
+    "\nTASK: GENERATE 3 DEDICATED SITUATIONAL & MEETING MESSAGES BASED ON THE INPUT:\n"
+    "You must return the response formatted EXACTLY with these 3 sections separated by specific tags:\n\n"
+    "===LEADERS_MSG===\n"
+    "(Formal, dignified, authoritative invite/message addressed to BRS District Leaders, Public Representatives, ZPTCs, MPTCs, and senior party functionaries. Mention date, time, venue, agenda importance, and request mandatory attendance).\n\n"
+    "===CADRE_MSG===\n"
+    "(Inspiring, high-energy, motivational mobilization message for BRS party workers, youth wings, social media warriors, and followers. High energy tone, invoking Telangana sentiments, unity, and party solidarity with slogans like 'జై తెలంగాణ - జై కేసీఆర్ - జై తాతా మధు').\n\n"
+    "===PRESS_INVITE===\n"
+    "(Official Media Advisory / Press Invitation for Print, Electronic & Digital Media correspondents. Formal invitation header, date, time, venue, topic, request for coverage, and coordinator contact footer).\n"
 )
 
 # Transliteration Helper
@@ -349,7 +360,7 @@ def get_printable_letterhead_html(content: str, date_str: str, location_str: str
     if lh_base64:
         header_html = f"""
         <div style="width: 100%; max-height: 180px; overflow: hidden; border-bottom: 2px solid #581c87; margin-bottom: 20px;">
-            <img src="data:image/png;base64,{lh_base64}" style="width: 100%; object-fit: cover; object-position: top center;" />
+            <img src="data:image/png;base64,{lh_banner_base64}" style="width: 100%; object-fit: cover; object-position: top center;" />
         </div>
         """
     else:
@@ -473,8 +484,8 @@ if backup_key and backup_key != api_key_input:
 # ----------------- MAIN UI (ALL CONTROLS IN MAIN CONSOLE) -----------------
 st.markdown(f"""
 <div class="header-card">
-    <h1>🎙️ ఎమ్మెల్సీ తాతా మధుసూదన్ — అధికారిక పత్రికా ప్రకటన కన్సోల్</h1>
-    <p>శాసనమండలి మీడియా సమన్వయ విభాగం | BRS Party</p>
+    <h1>🎙️ ఎమ్మెల్సీ తాతా మధుసూదన్ — అధికారిక కమ్యూనికేషన్ కన్సోల్</h1>
+    <p>శాసనమండలి మీడియా సమన్వయ విభాగం & పార్టీ కమ్యూనికేషన్స్ | BRS Party</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -487,18 +498,18 @@ with st.container():
     col_c1, col_c2, col_c3 = st.columns([1, 1.4, 1.6])
     
     with col_c1:
-        st.markdown("##### 📅 ప్రకటన తేదీ (Date):")
+        st.markdown("##### 📅 తేదీ (Date):")
         selected_date = st.date_input("తేదీని ఎంచుకోండి", value=datetime.date.today(), label_visibility="collapsed")
         formatted_date = selected_date.strftime("%d-%m-%Y")
 
     with col_c2:
-        st.markdown("##### 📍 స్థలం / వేదిక (Location):")
+        st.markdown("##### 📍 స్థలం / వేదిక (Location/Venue):")
         if "final_loc_key" not in st.session_state:
             st.session_state["final_loc_key"] = "ఖమ్మం"
             
         loc_eng = st.text_input(
             "ఇంగ్లీష్‌లో టైప్ చేయండి:", 
-            placeholder="e.g. Khammam, Palair...", 
+            placeholder="e.g. Khammam, Telangana Bhavan...", 
             key="loc_eng_input",
             label_visibility="collapsed"
         )
@@ -509,47 +520,56 @@ with st.container():
                 st.rerun()
 
         final_location = st.text_input(
-            "ఫైనల్ స్థలం:", 
+            "ఫైనల్ స్థలం / వేదిక:", 
             key="final_loc_key",
             label_visibility="collapsed"
         )
 
     with col_c3:
-        st.markdown("##### 🏷️ ప్రకటన విభాగం (Topic Scope):")
+        st.markdown("##### 🏷️ సందర్భం / విభాగం (Context / Topic Scope):")
         topic_scopes = [
-            "శుభాకాంక్షలు & సంతాపాలు (Greetings & Condolences)",
+            "పార్టీ ముఖ్య సమావేశం (Party Key Leaders Meeting)",
+            "నియోజకవర్గ విస్తృతస్థాయి సమావేశం (Constituency Broad Meeting)",
+            "ఆందోళనలు, ధర్నాలు & నిరసనలు (Protests & Agitations)",
             "ప్రజా సమస్యలు & వినతులు (Public Grievances & Demands)",
-            "ప్రభుత్వ విధానాలు / విమర్శలు (State Govt Policies / Criticisms)",
             "రైతాంగ & వ్యవసాయ సమస్యలు (Farmers & Agriculture Issues)",
-            "శాసనమండలి ప్రసంగాలు / ప్రశ్నలు (Council Speeches & Legislative Issues)",
-            "నియోజకవర్గ అభివృద్ధి & నిధులు (Constituency Development & Sanctions)",
-            "పార్టీ కార్యక్రమాలు & సమావేశాలు (Party Meetings & Organizational)",
-            "నిరసనలు, ధర్నాలు & పోరాటాలు (Protests & Agitations)",
-            "అధికారులతో సమీక్షలు / వినతులు (Official Reviews & Representations)",
+            "శుభాకాంక్షలు & సంతాపాలు (Greetings & Condolences)",
+            "ప్రభుత్వ విధానాలపై ప్రెస్ మీట్ (Press Meet on Govt Policies)",
             "సేవా కార్యక్రమాలు & సంక్షేమం (Social Welfare & Charity)",
         ]
         selected_scope = st.selectbox("విభాగం ఎంచుకోండి:", topic_scopes, label_visibility="collapsed")
 
 st.divider()
 
-# Format Selection & Input Modes
-col_opt1, col_opt2 = st.columns([1, 1])
+# Communication Category Selector: Press Note vs Meeting/Cadre Messages
+col_cat1, col_cat2 = st.columns([1.2, 1])
 
-with col_opt1:
-    press_length = st.radio(
-        "📝 ప్రెస్ నోట్ రకం (Press Note Format):",
-        ["📰 సమగ్ర అధికారిక ప్రకటన (Long / Mainline Print Daily)", "⚡ సంక్షిప్త ప్రకటన (Short / Digital & News Wire)"],
+with col_cat1:
+    comm_mode = st.radio(
+        "🎯 మీరు రూపొందించాలనుకుంటున్న కమ్యూనికేషన్ రకం:",
+        ["📢 సమావేశ ఆహ్వానాలు & సందేశాలు (Party Leaders, Cadre & Press)", "📰 అధికారిక పత్రికా ప్రకటన (Press Note)"],
         index=0,
         horizontal=True
     )
 
-with col_opt2:
-    input_mode = st.radio(
-        "📥 ఇన్‌పుట్ విధానం (Input Mode):",
-        ["✍️ సిట్యుయేషన్ నోట్స్ (Text)", "📁 ఆడియో / వీడియో ఫైల్ (File)", "🎤 లైవ్ రికార్డింగ్ (Mic)"],
-        index=0,
-        horizontal=True
-    )
+with col_cat2:
+    if "సందేశాలు" in comm_mode:
+        msg_meeting_time = st.text_input("⏰ సమావేశ సమయం (Time):", value="ఉదయం 11:00 గంటలకు", placeholder="e.g., ఉదయం 10:30 గంటలకు")
+    else:
+        press_length = st.radio(
+            "📝 ప్రెస్ నోట్ రకం:",
+            ["📰 సమగ్ర ప్రకటన (Long)", "⚡ సంక్షిప్త ప్రకటన (Short)"],
+            index=0,
+            horizontal=True
+        )
+
+# Media Input Selector
+input_mode = st.radio(
+    "📥 ఇన్‌పుట్ విధానం (Input Mode):",
+    ["✍️ సిట్యుయేషన్ నోట్స్ (Text)", "📁 ఆడియో / వీడియో ఫైల్ (File)", "🎤 లైవ్ రికార్డింగ్ (Mic)"],
+    index=0,
+    horizontal=True
+)
 
 st.write("")
 
@@ -563,7 +583,7 @@ if input_mode == "✍️ సిట్యుయేషన్ నోట్స్ (T
     with st.expander("🔤 ఇంగ్లీష్/టాంగ్లీష్‌లో టైప్ చేసి తెలుగులోకి మార్చండి", expanded=False):
         raw_eng = st.text_area(
             "ఇంగ్లీష్ లేదా టాంగ్లీష్ (Tanglish) లో టైప్ చేయండి:",
-            placeholder="ఉదాహరణ: Rythu Bandu inka Raledu, Tata Madhu garu mandapaddaru...",
+            placeholder="ఉదాహరణ: Telangana Bhavan lo meeting undi, leaders andaru attend kavali...",
             height=85,
             key="raw_eng_text"
         )
@@ -576,20 +596,19 @@ if input_mode == "✍️ సిట్యుయేషన్ నోట్స్ (T
             else:
                 st.warning("దయచేసి ఇంగ్లీష్‌లో టెక్స్ట్ టైప్ చేయండి.")
 
-    st.markdown("##### పత్రికా ప్రకటన కోసం ముఖ్యాంశాలు (Notes):")
+    st.markdown("##### సందర్భం / ఎజెండా ముఖ్య వివరాలు (Agenda / Situation Details):")
     notes_text = st.text_area(
         "తెలుగు వివరాలు (నేరుగా ఇక్కడ నమోదు చేయండి లేదా సవరించుకోండి):",
-        height=140,
+        height=130,
         value=st.session_state.get("final_notes_area", ""),
         key="notes_text_area",
-        placeholder="ఇక్కడ వివరాలు రాయండి (ఉదా: సంతాప ప్రకటన, సభ వివరాలు, రైతు సమస్యలు...)"
+        placeholder="సమావేశ ఎజెండా, ప్రాముఖ్యత లేదా సందర్భాన్ని ఇక్కడ రాయండి..."
     )
     if notes_text.strip():
         input_parts.append(types.Part.from_text(text=notes_text))
 
 elif input_mode == "📁 ఆడియో / వీడియో ఫైల్ (File)":
     st.markdown("##### 📁 మొబైల్ లేదా ల్యాప్‌టాప్ రికార్డింగ్ ఫైల్ ఎంచుకోండి:")
-    
     col_f1, col_f2 = st.columns([3, 1])
     with col_f1:
         uploaded_file = st.file_uploader(
@@ -639,7 +658,10 @@ elif input_mode == "🎤 లైవ్ రికార్డింగ్ (Mic)":
 
 st.divider()
 
-if st.button("🚀 పత్రికా ప్రకటనను రూపొందించండి (Generate Press Note)", type="primary", use_container_width=True):
+# Generation Action Button
+btn_label = "⚡ సందేశాలను రూపొందించండి (Generate 3 Dedicated Messages)" if "సందేశాలు" in comm_mode else "🚀 పత్రికా ప్రకటనను రూపొందించండి (Generate Press Note)"
+
+if st.button(btn_label, type="primary", use_container_width=True):
     if input_mode == "📁 ఆడియో / వీడియో ఫైల్ (File)" and st.session_state.get("audio_file_payload"):
         fn, fb, fm = st.session_state["audio_file_payload"]
         if len(fb) > 20 * 1024 * 1024:
@@ -665,30 +687,104 @@ if st.button("🚀 పత్రికా ప్రకటనను రూపొ�
     if not input_parts:
         st.error("⚠️ దయచేసి వివరాలు నమోదు చేయండి (నోట్స్, ఆడియో లేదా వీడియో).")
     else:
-        is_short = "Short" in press_length
-        chosen_sys_instruction = SYSTEM_INSTRUCTION_SHORT if is_short else SYSTEM_INSTRUCTION_LONG
-
-        with st.spinner("⚡ పత్రికా ప్రకటన తక్షణమే సిద్ధమవుతోంది..."):
+        with st.spinner("⚡ సందేశాలు / పత్రికా ప్రకటన సిద్ధమవుతోంది..."):
             try:
-                prompt_instruction = (
-                    f"\nప్రకటన విభాగం / స్వభావం: {selected_scope}\n"
-                    f"స్థలం: {final_location}\n"
-                    f"తేదీ: {formatted_date}\n"
-                    f"ఫార్మాట్: {'సంక్షిప్త ప్రకటన (Short Press Note)' if is_short else 'సమగ్ర అధికారిక ప్రకటన (Comprehensive Long Press Note)'}\n"
-                    "దయచేసి అందించిన సమాచారం ఆధారంగా "
-                    "ఎమ్మెల్సీ తాతా మధుసూదన్ గారి అధికారిక పత్రికా ప్రకటనను రూపొందించండి.\n"
-                )
+                if "సందేశాలు" in comm_mode:
+                    prompt_instruction = (
+                        f"\nసందర్భం / విభాగం: {selected_scope}\n"
+                        f"వేదిక / స్థలం: {final_location}\n"
+                        f"తేదీ: {formatted_date}\n"
+                        f"సమయం: {msg_meeting_time}\n"
+                        "నాయకుల కొరకు, పార్టీ శ్రేణుల కొరకు, మరియు ప్రెస్ ప్రతినిధుల కొరకు "
+                        "ఎమ్మెల్సీ తాతా మధుసూదన్ గారి పేరున 3 ప్రత్యేక సందేశాలను పైన తెలిపిన ఫార్మాట్‌లో రూపొందించండి.\n"
+                    )
+                    chosen_sys = SYSTEM_INSTRUCTION_MESSAGES
+                else:
+                    is_short = "Short" in press_length
+                    chosen_sys = SYSTEM_INSTRUCTION_SHORT if is_short else SYSTEM_INSTRUCTION_LONG
+                    prompt_instruction = (
+                        f"\nప్రకటన విభాగం: {selected_scope}\n"
+                        f"స్థలం: {final_location}\n"
+                        f"తేదీ: {formatted_date}\n"
+                        f"ఫార్మాట్: {'సంక్షిప్త ప్రకటన' if is_short else 'సమగ్ర అధికారిక ప్రకటన'}\n"
+                        "ఎమ్మెల్సీ తాతా మధుసూదన్ గారి అధికారిక పత్రికా ప్రకటనను రూపొందించండి.\n"
+                    )
+
                 parts_with_prompt = input_parts + [prompt_instruction]
-                press_note_telugu = generate_ai_response(active_keys, parts_with_prompt, chosen_sys_instruction)
-                st.session_state["draft_note"] = press_note_telugu
-                st.session_state["final_note"] = press_note_telugu
-                st.session_state["is_short_selected"] = is_short
-                st.session_state["is_finalized"] = False
+                ai_output = generate_ai_response(active_keys, parts_with_prompt, chosen_sys)
+                
+                if "సందేశాలు" in comm_mode:
+                    st.session_state["messages_output"] = ai_output
+                    st.session_state["is_message_mode"] = True
+                else:
+                    st.session_state["draft_note"] = ai_output
+                    st.session_state["final_note"] = ai_output
+                    st.session_state["is_short_selected"] = "Short" in press_length
+                    st.session_state["is_message_mode"] = False
+                    st.session_state["is_finalized"] = False
+
             except Exception as e:
                 st.error(f"సర్వర్ లోపం: {str(e)}")
 
-# Display, Edit & Refinement
-if "draft_note" in st.session_state:
+# =========================================================================
+# OUTPUT VIEW: DEDICATED MEETING MESSAGES (LEADERS, CADRE & PRESS SLOTS)
+# =========================================================================
+if st.session_state.get("is_message_mode", False) and "messages_output" in st.session_state:
+    st.divider()
+    st.subheader("📢 ఎమ్మెల్సీ తాతా మధు గారి అధికారిక సమావేశ సందేశాలు (3 Dedicated Slots)")
+    
+    raw_msgs = st.session_state["messages_output"]
+    
+    # Parse the 3 parts safely
+    leaders_text = ""
+    cadre_text = ""
+    press_text = ""
+    
+    if "===LEADERS_MSG===" in raw_msgs:
+        parts_1 = raw_msgs.split("===LEADERS_MSG===")[1]
+        if "===CADRE_MSG===" in parts_1:
+            leaders_text = parts_1.split("===CADRE_MSG===")[0].strip()
+            parts_2 = parts_1.split("===CADRE_MSG===")[1]
+            if "===PRESS_INVITE===" in parts_2:
+                cadre_text = parts_2.split("===PRESS_INVITE===")[0].strip()
+                press_text = parts_2.split("===PRESS_INVITE===")[1].strip()
+            else:
+                cadre_text = parts_2.strip()
+        else:
+            leaders_text = parts_1.strip()
+    else:
+        leaders_text = raw_msgs
+        cadre_text = raw_msgs
+        press_text = raw_msgs
+
+    tab_m1, tab_m2, tab_m3 = st.tabs([
+        "👥 ముఖ్య నాయకులకు (BRS Leaders)", 
+        "✊ పార్టీ శ్రేణులు & కార్యకర్తలకు (Cadre & Followers)", 
+        "🎙️ మీడియా & పత్రికా ప్రతినిధులకు (Press Invite)"
+    ])
+
+    with tab_m1:
+        st.markdown("##### 📌 ముఖ్య నాయకులు, ప్రజాప్రతినిధులకు సందేశం:")
+        edited_leader = st.text_area("సందేశం సవరించుకోండి (Edit):", value=leaders_text, height=220, key="edit_leader_msg")
+        wa_url_leader = f"https://api.whatsapp.com/send?text={urllib.parse.quote(edited_leader)}"
+        st.link_button("📲 నాయకులకు వాట్సాప్‌లో పంపండి (Send to Leaders)", wa_url_leader, use_container_width=True)
+
+    with tab_m2:
+        st.markdown("##### 📌 గ్రామ, మండల స్థాయి పార్టీ శ్రేణులు, యువజన విభాగానికి సందేశం:")
+        edited_cadre = st.text_area("సందేశం సవరించుకోండి (Edit):", value=cadre_text, height=220, key="edit_cadre_msg")
+        wa_url_cadre = f"https://api.whatsapp.com/send?text={urllib.parse.quote(edited_cadre)}"
+        st.link_button("📲 శ్రేణులకు వాట్సాప్‌లో పంపండి (Mobilize Cadre)", wa_url_cadre, use_container_width=True)
+
+    with tab_m3:
+        st.markdown("##### 📌 ప్రింట్ & ఎలక్ట్రానిక్ మీడియా ప్రతినిధులకు అధికారిక ఆహ్వానం:")
+        edited_press = st.text_area("ఆహ్వానం సవరించుకోండి (Edit):", value=press_text, height=220, key="edit_press_msg")
+        wa_url_press = f"https://api.whatsapp.com/send?text={urllib.parse.quote(edited_press)}"
+        st.link_button("📲 మీడియా ప్రతినిధులకు ఆహ్వానం పంపండి (Invite Press)", wa_url_press, use_container_width=True)
+
+# =========================================================================
+# OUTPUT VIEW: OFFICIAL PRESS NOTE (ON OFFICIAL LETTERHEAD)
+# =========================================================================
+elif not st.session_state.get("is_message_mode", False) and "draft_note" in st.session_state:
     st.subheader("✏️ ఎడిట్ & AI సలహాలు (Edit & AI Remarks)")
     
     edited_note = st.text_area(
@@ -698,37 +794,35 @@ if "draft_note" in st.session_state:
         key="editor_area"
     )
     
-    st.markdown("##### 🤖 జెమినీ AI సలహా / మోడ్ మార్పు (AI Tone & Situation Re-generator):")
+    st.markdown("##### 🤖 జెమినీ AI సలహా / మోడ్ మార్పు:")
     with st.expander("💡 ప్రెస్ నోట్ మార్పులు (రైతుల ఆవేదన పెంచడం, వివరాలు చేర్చడం, స్పష్టత ఇవ్వడం)", expanded=False):
         ai_remark = st.text_input(
-            "మీ సూచన లేదా అభ్యర్థనను ఇక్కడ రాయండి (English or Telugu):",
+            "మీ సూచనను ఇక్కడ రాయండి (English or Telugu):",
             placeholder="e.g., 'సంతాప సందేశాన్ని మరింత భావోద్వేగంగా మార్చండి'..."
         )
         if st.button("⚡ సూచన ఆధారంగా ప్రెస్ నోట్ తిరిగి రూపొందించండి (Re-generate with AI)", use_container_width=True):
             if ai_remark.strip():
-                with st.spinner("మీ సూచన ప్రకారం ప్రెస్ నోట్‌ను సరిచేస్తోంది..."):
+                with st.spinner("సరిచేస్తోంది..."):
                     try:
                         is_short = st.session_state.get("is_short_selected", False)
-                        chosen_sys_instruction = SYSTEM_INSTRUCTION_SHORT if is_short else SYSTEM_INSTRUCTION_LONG
+                        chosen_sys = SYSTEM_INSTRUCTION_SHORT if is_short else SYSTEM_INSTRUCTION_LONG
                         refine_prompt = f"""
                         CURRENT PRESS NOTE DRAFT:
                         {edited_note}
                         
-                        USER INSTRUCTION / REMARK / SITUATION UPDATE:
+                        USER INSTRUCTION:
                         {ai_remark}
                         
                         TASK:
-                        Rewrite and refine the press release strictly following the user's instructions while maintaining the official persona of MLC Tata Madhusudhan Garu and standard Telugu journalistic standards.
+                        Rewrite and refine strictly following user instructions while maintaining MLC Tata Madhusudhan Garu's persona.
                         """
-                        updated_note = generate_ai_response(active_keys, [refine_prompt], chosen_sys_instruction)
+                        updated_note = generate_ai_response(active_keys, [refine_prompt], chosen_sys)
                         st.session_state["draft_note"] = updated_note
                         st.session_state["final_note"] = updated_note
-                        st.success("✅ మీ సూచన ప్రకారం ప్రెస్ నోట్ విజయవంతంగా మార్చబడింది!")
+                        st.success("✅ విజయవంతంగా మార్చబడింది!")
                         st.rerun()
                     except Exception as err:
                         st.error(f"రీ-జనరేట్ ఎర్రర్: {str(err)}")
-            else:
-                st.warning("దయచేసి మార్పుల కోసం సూచనను నమోదు చేయండి.")
 
     st.write("")
     if st.button("✅ పూర్తయింది - లెటర్‌హెడ్ & ఎగుమతి వీక్షించండి (Finalize)", type="primary", use_container_width=True):
@@ -736,8 +830,7 @@ if "draft_note" in st.session_state:
         st.session_state["is_finalized"] = True
         st.success("ప్రెస్ నోట్ ఖరారైంది! అధికారిక లెటర్‌హెడ్ వీక్షణ సిద్ధంగా ఉంది.")
 
-# Official Canvas & Document Hub
-if st.session_state.get("is_finalized", False):
+if st.session_state.get("is_finalized", False) and not st.session_state.get("is_message_mode", False):
     final_content = st.session_state.get("final_note", "")
     is_short = st.session_state.get("is_short_selected", False)
     
@@ -749,14 +842,11 @@ if st.session_state.get("is_finalized", False):
             break
 
     st.divider()
-    
-    # ----------------- DIRECT 1-CLICK ACTIONS -----------------
     st.markdown("### 📄 Google Docs & డాక్యుమెంట్ ఎగుమతి")
     
     col_exp1, col_exp2 = st.columns([1, 1])
-    
     with col_exp1:
-        st.info("💡 **Google Docs లోకి నేరుగా:** Word File (.DOCX) ఫైల్‌ను డౌన్‌లోడ్ చేసి Google Drive / Docs లో తెరిస్తే హెడర్, లెటర్‌హెడ్ మరియు తేదీలతో పాటు వస్తుంది.")
+        st.info("💡 **Google Docs లోకి నేరుగా:** Word File (.DOCX) ఫైల్‌ను డౌన్‌లోడ్ చేసి Google Drive / Docs లో తెరిస్తే హెడర్, లెటర్‌హెడ్ మరియు తేదీలతో సహా వస్తుంది.")
         docx_data = create_docx_press_note(final_content, formatted_date, final_location, is_short)
         st.download_button(
             label="📄 Word File (.DOCX) డౌన్‌లోడ్ చేయండి",
@@ -786,7 +876,7 @@ if st.session_state.get("is_finalized", False):
                         <div style="font-size: 13px; color: #555;">Khammam, Telangana</div>
                     </td>
                     <td style="width: 20%; text-align: center; vertical-align: middle;">
-                        <div style="font-size: 38px;">🏛️</div>
+                        <div style="font-size: 40px;">🏛️</div>
                     </td>
                     <td style="width: 40%; text-align: right; vertical-align: top; font-size: 11px; color: #444; line-height: 1.4;">
                         Quarter No. 1104, 11th Floor,<br>
@@ -822,7 +912,6 @@ if st.session_state.get("is_finalized", False):
     st.markdown(canvas_html, unsafe_allow_html=True)
     
     st.write("")
-    
     col_d1, col_d2 = st.columns(2)
     with col_d1:
         html_page = get_printable_letterhead_html(final_content, formatted_date, final_location, lh_banner_base64)
@@ -843,33 +932,7 @@ if st.session_state.get("is_finalized", False):
             use_container_width=True
         )
 
-    st.write("")
-    st.subheader("🌐 సోషల్ మీడియా పోస్టులు (Ready to Copy & Paste)")
-    summary_body = "\n".join(lines[1:5]) if len(lines) > 1 else final_content
-
-    whatsapp_text = f"*{headline}*\n\n{final_content}\n\n_విడుదల: ఎమ్మెల్సీ తాతా మధుసూదన్ గారి కార్యాలయం_"
-    twitter_text = f"🚨 {headline[:180]}\n\n- ఎమ్మెల్సీ తాతా మధుసూదన్\n\n#TataMadhu #BRSParty #Telangana #Khammam"
-    facebook_text = f"📌 {headline}\n\n{final_content}\n\n#TataMadhusudhan #TataMadhu #BRS #Khammam #TelanganaPolitics"
-    instagram_text = f"📢 {headline}\n.\n.\n{summary_body[:400]}...\n.\n.\n#TataMadhu #MLCTataMadhu #BRS #Khammam #Telangana #PrajaGontuka"
-    youtube_text = f"TITLE:\n{headline} | MLC Tata Madhusudhan Speech\n\nDESCRIPTION:\n{final_content}\n\n#TataMadhu #BRS #TelanganaNews #MLCSpeech"
-
-    st1, st2, st3, st4, st5 = st.tabs(["🟢 WhatsApp", "🔵 Twitter (X)", "🔷 Facebook", "📸 Instagram", "🔴 YouTube"])
-    with st1:
-        st.text_area("WhatsApp Text:", value=whatsapp_text, height=180)
-        wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(whatsapp_text[:1400])}"
-        st.link_button("📲 వాట్సాప్‌లో షేర్ చేయండి", wa_url, use_container_width=True)
-    with st2:
-        st.text_area("Twitter (X) Post:", value=twitter_text, height=140)
-        x_url = f"https://twitter.com/intent/tweet?text={urllib.parse.quote(twitter_text)}"
-        st.link_button("🐦 X (Twitter) లో పోస్ట్ చేయండి", x_url, use_container_width=True)
-    with st3:
-        st.text_area("Facebook Post:", value=facebook_text, height=180)
-    with st4:
-        st.text_area("Instagram Caption:", value=instagram_text, height=180)
-    with st5:
-        st.text_area("YouTube Title & Description:", value=youtube_text, height=180)
-
-# Footer
+# Footer Developer Attribution
 st.markdown("---")
 dev_footer_img = f'<img src="data:image/jpeg;base64,{dev_image_base64}" style="width: 36px; height: 36px; border-radius: 50%; vertical-align: middle; margin-right: 10px; border: 1.5px solid #7e22ce;">' if dev_image_base64 else '👨‍💻 '
 st.markdown(
